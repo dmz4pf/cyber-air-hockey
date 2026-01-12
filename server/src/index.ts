@@ -7,13 +7,13 @@ import { roomManager } from './roomManager';
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 8080;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
-// CORS configuration - update with your Vercel domain after deployment
+// CORS configuration
 const ALLOWED_ORIGINS = [
   'http://localhost:3000',
   'http://localhost:3001',
-  // Add your Vercel domains here after deployment
-  // 'https://your-app.vercel.app',
-  // 'https://your-custom-domain.com',
+  // Vercel production domains
+  'https://air-hockey-ten.vercel.app',
+  'https://air-hockey-damilolas-projects-fafdf859.vercel.app',
 ];
 
 // In production, you can also set this via environment variable
