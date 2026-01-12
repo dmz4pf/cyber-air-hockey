@@ -1,0 +1,23 @@
+[package]
+name = "air-hockey"
+version = "0.1.0"
+edition = "2021"
+description = "Linera smart contract for Air Hockey staked multiplayer games"
+license = "Apache-2.0"
+
+[dependencies]
+linera-sdk = { version = "0.12", features = ["wit-bindgen"] }
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
+async-trait = "0.1"
+
+[dev-dependencies]
+linera-sdk = { version = "0.12", features = ["test"] }
+
+[[bin]]
+name = "air_hockey_contract"
+path = "src/contract.rs"
+
+[[bin]]
+name = "air_hockey_service"
+path = "src/service.rs"

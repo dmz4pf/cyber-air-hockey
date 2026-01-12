@@ -1,0 +1,62 @@
+import { ReactNode } from 'react';
+
+export type DesignId = 'neon-arcade' | 'minimalist' | 'retro-pixel' | 'ice-stadium' | 'cyber-esports';
+
+export interface DesignConfig {
+  id: DesignId;
+  name: string;
+  description: string;
+
+  // Visual configuration
+  colors: {
+    background: string;
+    backgroundSecondary: string;
+    surface: string;
+    border: string;
+
+    player1: string;
+    player1Glow: string;
+    player2: string;
+    player2Glow: string;
+
+    puck: string;
+    puckGlow: string;
+
+    text: string;
+    textMuted: string;
+    accent: string;
+
+    goalZone1: string;
+    goalZone2: string;
+  };
+
+  effects: {
+    glowIntensity: number;
+    scanlines: boolean;
+    crtCurve: boolean;
+    pixelated: boolean;
+    trailEffect: boolean;
+    screenShake: boolean;
+  };
+
+  fonts: {
+    heading: string;
+    body: string;
+    score: string;
+  };
+}
+
+export interface DesignComponents {
+  GamePage: React.ComponentType;
+  GameCanvas: React.ComponentType<{ getBodies: () => any }>;
+  ScoreBoard: React.ComponentType;
+  Menu: React.ComponentType;
+  CountdownOverlay: React.ComponentType;
+  GameOverModal: React.ComponentType;
+  PauseMenu: React.ComponentType;
+}
+
+export interface Design {
+  config: DesignConfig;
+  components: DesignComponents;
+}
