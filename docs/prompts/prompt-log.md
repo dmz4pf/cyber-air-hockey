@@ -27,3 +27,12 @@
 - Deployed WebSocket server to Render (free tier): https://cyber-air-hockey.onrender.com
 - Deployed frontend to Vercel: https://air-hockey-ten.vercel.app
 - Configured environment variables and CORS whitelist
+
+### Prompt 4
+> both games arent syncing even after using the correct id. confirm if these transactions im approving are on the linera sdk and testnet. plus im seeing no gas tokens. i just want actual blockchain transactions with gas tokens taken. device a comprehensive plan on the implementation of everything
+
+**Action:** Created comprehensive plan for real Linera blockchain integration:
+- Analyzed current state: game running in MOCK mode (fake transactions)
+- Identified issues: WebSocket sync broken (Render sleeping), no @linera/client installed, contracts not deployed
+- Created 7-phase implementation plan in `/docs/plans/LINERA_BLOCKCHAIN_INTEGRATION_PLAN.md`
+- Plan covers: contract deployment, real MetaMask signing, gas token consumption, stake locking, winner payouts

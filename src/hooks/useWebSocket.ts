@@ -12,9 +12,10 @@ import type {
 } from '@/types/websocket';
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080';
-const RECONNECT_DELAY = 3000;
-const PING_INTERVAL = 25000;
-const MAX_RECONNECT_ATTEMPTS = 5;
+const RECONNECT_DELAY = 2000;
+const PING_INTERVAL = 15000; // Ping every 15s to keep Render awake (free tier sleeps after 15min)
+const MAX_RECONNECT_ATTEMPTS = 10; // More attempts for free tier servers
+const CONNECTION_TIMEOUT = 10000; // 10s timeout for initial connection
 
 interface UseWebSocketOptions {
   autoConnect?: boolean;
@@ -209,8 +210,25 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     }
   }, []);
 
+  // Wake up the server (for Render free tier)
+  const wakeUpServer = useCallback(async () => {
+    try {
+      // Hit the health endpoint to wake up the server
+      const healthUrl = WS_URL.replace('wss://', 'https://').replace('ws://', 'http://') + '/health';
+      console.log('[WebSocket] Waking up server...', healthUrl);
+      const response = await fetch(healthUrl, { method: 'GET' });
+      if (response.ok) {
+        console.log('[WebSocket] Server is awake');
+        return true;
+      }
+    } catch (e) {
+      console.log('[WebSocket] Server wake-up request sent (may take 30-60s on free tier)');
+    }
+    return false;
+  }, []);
+
   // Connect to server
-  const connect = useCallback(() => {
+  const connect = useCallback(async () => {
     if (isUnmountedRef.current) return;
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
     if (wsRef.current?.readyState === WebSocket.CONNECTING) return;
@@ -219,17 +237,29 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
     setState(s => ({ ...s, connectionStatus: 'connecting' }));
 
+    // Try to wake up server first (for Render free tier)
+    await wakeUpServer();
+
     const ws = new WebSocket(WS_URL);
     wsRef.current = ws;
 
+    // Connection timeout
+    const connectionTimeout = setTimeout(() => {
+      if (ws.readyState === WebSocket.CONNECTING) {
+        console.log('[WebSocket] Connection timeout, retrying...');
+        ws.close();
+      }
+    }, CONNECTION_TIMEOUT);
+
     ws.onopen = () => {
+      clearTimeout(connectionTimeout);
       if (isUnmountedRef.current) {
         ws.close();
         return;
       }
-      console.log('WebSocket connected');
+      console.log('[WebSocket] Connected to', WS_URL);
 
-      // Start ping interval
+      // Start ping interval to keep server awake
       pingIntervalRef.current = setInterval(() => {
         lastPingSentRef.current = Date.now();
         send({ type: 'ping' });
@@ -263,7 +293,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     };
 
     ws.onerror = (err) => {
-      console.error('WebSocket error:', err);
+      console.error('[WebSocket] Error:', err);
     };
 
     ws.onmessage = (event) => {
@@ -271,10 +301,10 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         const message: ServerMessage = JSON.parse(event.data);
         handleMessage(message);
       } catch (e) {
-        console.error('Failed to parse message:', e);
+        console.error('[WebSocket] Failed to parse message:', e);
       }
     };
-  }, [clearTimers, send, handleMessage]);
+  }, [clearTimers, send, handleMessage, wakeUpServer]);
 
   // Disconnect from server
   const disconnect = useCallback(() => {

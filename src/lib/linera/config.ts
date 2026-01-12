@@ -15,7 +15,8 @@ export const LINERA_CONFIG = {
   faucetUrl: process.env.NEXT_PUBLIC_LINERA_FAUCET_URL || 'https://faucet.testnet-archimedes.linera.net',
 
   // Node service URL (GraphQL endpoint)
-  nodeServiceUrl: process.env.NEXT_PUBLIC_LINERA_NODE_URL || 'http://localhost:8080',
+  // Use testnet RPC by default for production
+  nodeServiceUrl: process.env.NEXT_PUBLIC_LINERA_NODE_URL || 'https://rpc.testnet-archimedes.linera.net',
 
   // Deployed application ID
   applicationId: process.env.NEXT_PUBLIC_LINERA_APPLICATION_ID || '',
