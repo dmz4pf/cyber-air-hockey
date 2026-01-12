@@ -17,3 +17,13 @@
 - Created `railway.json` and `nixpacks.toml` for Railway server deployment
 - Updated `.env.example` files with production configuration notes
 - Verified both frontend and server builds succeed
+
+### Prompt 3
+> continue with next steps
+
+**Action:** Executed full deployment:
+- Initialized git repository
+- Created GitHub repo: https://github.com/dmz4pf/cyber-air-hockey
+- Deployed WebSocket server to Render (free tier): https://cyber-air-hockey.onrender.com
+- Deployed frontend to Vercel: https://air-hockey-ten.vercel.app
+- Configured environment variables and CORS whitelist
