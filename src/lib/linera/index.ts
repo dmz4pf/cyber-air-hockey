@@ -2,13 +2,13 @@
  * Linera Library Exports
  *
  * Exports the appropriate Linera client based on configuration.
- * - Development: Uses MockLineraClient for local testing
- * - Production: Uses RealLineraClient with @linera/client
+ * - Development (USE_MOCK=true): Uses MockLineraClient for local testing
+ * - Production (USE_MOCK=false): Uses ProductionLineraClient with real blockchain
  */
 
 import { USE_MOCK_CLIENT, logConfig } from './config';
 import { MockLineraClient, getLineraClient as getMockClient } from './client';
-import { RealLineraClient, getRealLineraClient } from './linera-client';
+import { ProductionLineraClient, getProductionLineraClient } from './real-client';
 import type { LineraClient, WalletState } from './types';
 
 // Log configuration on module load (development only)
@@ -20,7 +20,7 @@ if (typeof window !== 'undefined') {
 export * from './types';
 
 // Export config
-export { LINERA_CONFIG, USE_MOCK_CLIENT, validateConfig, logConfig } from './config';
+export { LINERA_CONFIG, USE_MOCK_CLIENT, validateConfig, logConfig, GRAPHQL_ENDPOINTS, WS_CONFIG } from './config';
 
 // Export utilities from client
 export { formatStake, parseStake, shortenAddress } from './client';
@@ -59,15 +59,22 @@ export {
 
 // Export individual client classes
 export { MockLineraClient } from './client';
+export { ProductionLineraClient } from './real-client';
+
+// Legacy export for backwards compatibility
 export { RealLineraClient } from './linera-client';
 
 /**
  * Get the Linera client instance
  *
- * Returns either MockLineraClient or RealLineraClient based on configuration.
+ * Returns either MockLineraClient or ProductionLineraClient based on configuration.
  * The returned client implements the LineraClient interface.
+ *
+ * Configuration:
+ * - Set NEXT_PUBLIC_USE_MOCK_LINERA=false for real blockchain
+ * - Set NEXT_PUBLIC_LINERA_APPLICATION_ID for your deployed contract
+ * - Set NEXT_PUBLIC_LINERA_CHAIN_ID for your chain
  */
-// Track if we've logged the client type
 let hasLoggedClientType = false;
 
 export function getLineraClient(): LineraClient & {
@@ -76,14 +83,19 @@ export function getLineraClient(): LineraClient & {
   // Only log once per session
   if (!hasLoggedClientType && typeof window !== 'undefined') {
     hasLoggedClientType = true;
-    console.log(`[Linera] Using ${USE_MOCK_CLIENT ? 'mock' : 'real'} client`);
+    console.log(`[Linera] Using ${USE_MOCK_CLIENT ? 'MOCK' : 'PRODUCTION'} client`);
+
+    if (!USE_MOCK_CLIENT) {
+      console.log('[Linera] Real blockchain mode enabled');
+      console.log('[Linera] Transactions will consume gas tokens');
+    }
   }
 
   if (USE_MOCK_CLIENT) {
     return getMockClient();
   }
 
-  return getRealLineraClient();
+  return getProductionLineraClient();
 }
 
 /**
@@ -96,6 +108,20 @@ export function isUsingMockClient(): boolean {
 /**
  * Get client type string
  */
-export function getClientType(): 'mock' | 'real' {
-  return USE_MOCK_CLIENT ? 'mock' : 'real';
+export function getClientType(): 'mock' | 'production' {
+  return USE_MOCK_CLIENT ? 'mock' : 'production';
+}
+
+/**
+ * Force get mock client (for testing)
+ */
+export function getMockLineraClient(): MockLineraClient {
+  return getMockClient();
+}
+
+/**
+ * Force get production client
+ */
+export function getRealLineraClient(): ProductionLineraClient {
+  return getProductionLineraClient();
 }
