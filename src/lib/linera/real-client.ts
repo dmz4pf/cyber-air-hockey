@@ -37,7 +37,7 @@ import {
   connectMetaMask,
   signMessage,
   disconnectMetaMask,
-  onAccountChanged,
+  onAccountsChanged,
   onDisconnect,
 } from './metamask';
 
@@ -88,7 +88,7 @@ export class ProductionLineraClient implements LineraClient {
 
   private setupMetaMaskListeners() {
     // Listen for account changes
-    const accountUnsub = onAccountChanged((accounts) => {
+    const accountUnsub = onAccountsChanged((accounts) => {
       if (accounts.length === 0) {
         this.handleDisconnect();
       } else if (accounts[0] !== this.walletState.address) {
