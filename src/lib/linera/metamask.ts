@@ -311,3 +311,16 @@ export function getMetaMaskSigner(): MetaMaskSigner {
   }
   return signerInstance;
 }
+
+/**
+ * Disconnect from MetaMask (clears local state)
+ * Note: MetaMask doesn't support programmatic disconnect - user must disconnect from extension
+ * This function clears local application state
+ */
+export function disconnectMetaMask(): void {
+  // Clear the singleton signer instance
+  if (signerInstance) {
+    signerInstance.disconnect();
+  }
+  signerInstance = null;
+}
