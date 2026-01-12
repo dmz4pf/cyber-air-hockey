@@ -8,12 +8,9 @@ const nextConfig: NextConfig = {
   // Compress responses
   compress: true,
 
-  // Build configuration - ignore errors for deployment
+  // Build configuration - ignore TypeScript errors for deployment
   typescript: {
     ignoreBuildErrors: true,
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
   },
 
   // Security headers
