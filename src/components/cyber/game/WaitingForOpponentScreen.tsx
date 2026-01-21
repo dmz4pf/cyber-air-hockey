@@ -10,7 +10,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { cyberTheme } from '@/lib/cyber/theme';
 import { useGameStore } from '@/stores/gameStore';
-import { useWalletAuth } from '@/providers/WalletAuthProvider';
+import { useDynamicWallet } from '@/hooks/useDynamicWallet';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { HUDPanel } from '../ui/HUDPanel';
 import { CyberButton } from '../ui/CyberButton';
@@ -24,7 +24,7 @@ export function WaitingForOpponentScreen({ className = '' }: WaitingForOpponentS
   const [dots, setDots] = useState('');
   const [wsError, setWsError] = useState<string | null>(null);
 
-  const { shortAddress } = useWalletAuth();
+  const { shortAddress } = useDynamicWallet();
   const multiplayerGameInfo = useGameStore((s) => s.multiplayerGameInfo);
   const setPageState = useGameStore((s) => s.setPageState);
   const setOpponentConnected = useGameStore((s) => s.setOpponentConnected);

@@ -3,13 +3,14 @@
 /**
  * CreateGameModal - Create a new multiplayer game
  *
- * Displays wallet info and signs blockchain transaction to create game.
+ * Displays wallet info and creates game on Linera blockchain.
  * On success, generates unique game ID and transitions to waiting state.
  */
 
 import React, { useState } from 'react';
 import { cyberTheme } from '@/lib/cyber/theme';
-import { useWalletAuth } from '@/providers/WalletAuthProvider';
+import { useDynamicWallet } from '@/hooks/useDynamicWallet';
+import { useLineraGame } from '@/hooks/useLineraGame';
 import { useGameStore } from '@/stores/gameStore';
 import { generateGameId } from '@/lib/cyber/gameId';
 import { Modal } from '../ui/Modal';
@@ -20,20 +21,19 @@ interface CreateGameModalProps {
   onClose: () => void;
 }
 
-type CreateState = 'idle' | 'signing' | 'creating' | 'success' | 'error';
+type CreateState = 'idle' | 'creating' | 'success' | 'error';
 
 export function CreateGameModal({ isOpen, onClose }: CreateGameModalProps) {
   const [state, setState] = useState<CreateState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [gameId, setGameId] = useState<string | null>(null);
 
-  const { address, shortAddress, signMessage } = useWalletAuth();
+  const { address, shortAddress } = useDynamicWallet();
+  const { createGame, isLoading } = useLineraGame();
   const createMultiplayerGame = useGameStore((s) => s.createMultiplayerGame);
 
   const handleCreateGame = async () => {
-    if (!address) return;
-
-    setState('signing');
+    setState('creating');
     setError(null);
 
     try {
@@ -41,20 +41,12 @@ export function CreateGameModal({ isOpen, onClose }: CreateGameModalProps) {
       const newGameId = generateGameId();
       setGameId(newGameId);
 
-      // Create message to sign for blockchain transaction
-      const timestamp = Date.now();
-      const message = `Create Air Hockey Game\n\nGame ID: ${newGameId}\nCreator: ${address}\nTimestamp: ${timestamp}\n\nSign to create this game on the blockchain.`;
-
-      // Request wallet signature
-      await signMessage(message);
-
-      setState('creating');
-
-      // Simulate blockchain transaction delay
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // Create game on Linera blockchain
+      // Using "0" stake for now - can be made configurable later
+      await createGame('0', newGameId);
 
       // Update store with new game
-      createMultiplayerGame(newGameId, address);
+      createMultiplayerGame(newGameId, address || 'local-player');
 
       setState('success');
 
@@ -77,12 +69,12 @@ export function CreateGameModal({ isOpen, onClose }: CreateGameModalProps) {
   };
 
   const handleClose = () => {
-    if (state === 'signing' || state === 'creating') return; // Don't close while processing
+    if (state === 'creating') return; // Don't close while processing
     resetState();
     onClose();
   };
 
-  const isProcessing = state === 'signing' || state === 'creating';
+  const isProcessing = state === 'creating' || isLoading;
 
   return (
     <Modal
@@ -130,12 +122,12 @@ export function CreateGameModal({ isOpen, onClose }: CreateGameModalProps) {
             className="text-sm"
             style={{ color: cyberTheme.colors.text.secondary }}
           >
-            Creating a game will sign a blockchain transaction. You&apos;ll receive
+            Creating a game will register it on the Linera blockchain. You&apos;ll receive
             a unique Game ID to share with your opponent.
           </p>
         </div>
 
-        {/* Game ID Preview (when signing/creating) */}
+        {/* Game ID Preview (when creating) */}
         {gameId && (
           <div
             className="p-4 rounded-lg text-center"
@@ -177,15 +169,6 @@ export function CreateGameModal({ isOpen, onClose }: CreateGameModalProps) {
         )}
 
         {/* Status Messages */}
-        {state === 'signing' && (
-          <div
-            className="text-center text-sm animate-pulse"
-            style={{ color: cyberTheme.colors.warning }}
-          >
-            Please sign the transaction in your wallet...
-          </div>
-        )}
-
         {state === 'creating' && (
           <div
             className="text-center text-sm animate-pulse"
@@ -211,8 +194,7 @@ export function CreateGameModal({ isOpen, onClose }: CreateGameModalProps) {
             onClick={handleCreateGame}
             disabled={isProcessing || state === 'success'}
           >
-            {state === 'idle' && 'Create & Sign'}
-            {state === 'signing' && 'Signing...'}
+            {state === 'idle' && 'Create Game'}
             {state === 'creating' && 'Creating...'}
             {state === 'success' && 'Success!'}
             {state === 'error' && 'Try Again'}

@@ -1,13 +1,13 @@
 'use client';
 
 /**
- * NavLinks - Navigation links component
+ * NavLinks - Theme-aware navigation links
  */
 
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { cyberTheme } from '@/lib/cyber/theme';
+import { useThemedStyles } from '@/lib/cyber/useThemedStyles';
 
 interface NavLink {
   href: string;
@@ -43,6 +43,7 @@ export function NavLinks({
   className = '',
 }: NavLinksProps) {
   const pathname = usePathname();
+  const theme = useThemedStyles();
 
   return (
     <nav
@@ -60,26 +61,26 @@ export function NavLinks({
             className={`flex items-center gap-2 rounded-md ${sizeConfig[size]} transition-all duration-200`}
             style={{
               backgroundColor: isActive
-                ? `${cyberTheme.colors.primary}20`
+                ? `${theme.colors.primary}20`
                 : 'transparent',
               color: isActive
-                ? cyberTheme.colors.primary
-                : cyberTheme.colors.text.secondary,
-              fontFamily: cyberTheme.fonts.heading,
+                ? theme.colors.primary
+                : theme.colors.text.secondary,
+              fontFamily: theme.fonts.heading,
               fontWeight: 600,
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
             }}
             onMouseEnter={(e) => {
               if (!isActive) {
-                e.currentTarget.style.backgroundColor = `${cyberTheme.colors.primary}10`;
-                e.currentTarget.style.color = cyberTheme.colors.text.primary;
+                e.currentTarget.style.backgroundColor = `${theme.colors.primary}10`;
+                e.currentTarget.style.color = theme.colors.text.primary;
               }
             }}
             onMouseLeave={(e) => {
               if (!isActive) {
                 e.currentTarget.style.backgroundColor = 'transparent';
-                e.currentTarget.style.color = cyberTheme.colors.text.secondary;
+                e.currentTarget.style.color = theme.colors.text.secondary;
               }
             }}
           >

@@ -7,85 +7,14 @@
 
 mod state;
 
+use air_hockey::{AirHockeyAbi, InstantiationArgument, Message, Operation};
 use linera_sdk::{
-    base::{Amount, Owner, WithContractAbi},
-    views::{RootView, View, ViewStorageContext},
+    abi::WithContractAbi,
+    views::{RootView, View},
     Contract, ContractRuntime,
 };
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
 use crate::state::{AirHockeyState, Game, GameStatus};
-
-/// Operations that can be executed on the contract
-#[derive(Debug, Serialize, Deserialize)]
-pub enum Operation {
-    /// Initialize the contract with owner
-    Initialize { owner: String },
-    /// Create a new staked game
-    CreateGame { stake: u128, room_code: String },
-    /// Join an existing game
-    JoinGame { game_id: u64 },
-    /// Submit game result (both players must agree or server attests)
-    SubmitResult {
-        game_id: u64,
-        player1_score: u8,
-        player2_score: u8,
-    },
-    /// Cancel a waiting game and get refund
-    CancelGame { game_id: u64 },
-    /// Claim winnings from a completed game
-    ClaimWinnings { game_id: u64 },
-}
-
-/// Messages that can be sent between chains
-#[derive(Debug, Serialize, Deserialize)]
-pub enum Message {
-    /// Notify about game creation
-    GameCreated {
-        game_id: u64,
-        creator: String,
-        stake: u128,
-        room_code: String,
-    },
-    /// Notify about game being joined
-    GameJoined {
-        game_id: u64,
-        opponent: String,
-    },
-    /// Notify about game completion
-    GameCompleted {
-        game_id: u64,
-        winner: Option<String>,
-        player1_score: u8,
-        player2_score: u8,
-    },
-    /// Notify about game cancellation
-    GameCancelled {
-        game_id: u64,
-    },
-}
-
-/// Contract errors
-#[derive(Debug, Error)]
-pub enum ContractError {
-    #[error("Not initialized")]
-    NotInitialized,
-    #[error("Already initialized")]
-    AlreadyInitialized,
-    #[error("Insufficient funds")]
-    InsufficientFunds,
-    #[error("Game not found")]
-    GameNotFound,
-    #[error("Game cannot be joined")]
-    CannotJoin,
-    #[error("Not authorized")]
-    NotAuthorized,
-    #[error("Invalid operation")]
-    InvalidOperation,
-    #[error("State error: {0}")]
-    StateError(String),
-}
 
 pub struct AirHockeyContract {
     state: AirHockeyState,
@@ -95,96 +24,76 @@ pub struct AirHockeyContract {
 linera_sdk::contract!(AirHockeyContract);
 
 impl WithContractAbi for AirHockeyContract {
-    type Abi = air_hockey::AirHockeyAbi;
+    type Abi = AirHockeyAbi;
 }
 
 impl Contract for AirHockeyContract {
-    type Error = ContractError;
-    type Storage = ViewStorageContext;
-    type State = AirHockeyState;
     type Message = Message;
+    type Parameters = ();
+    type InstantiationArgument = InstantiationArgument;
+    type EventValue = ();
 
-    async fn new(state: AirHockeyState, runtime: ContractRuntime<Self>) -> Result<Self, Self::Error> {
-        Ok(Self { state, runtime })
+    async fn load(runtime: ContractRuntime<Self>) -> Self {
+        let state = AirHockeyState::load(runtime.root_view_storage_context())
+            .await
+            .expect("Failed to load state");
+        Self { state, runtime }
     }
 
-    fn state_mut(&mut self) -> &mut Self::State {
-        &mut self.state
+    async fn instantiate(&mut self, argument: Self::InstantiationArgument) {
+        self.state.owner.set(argument.owner);
+        self.state.next_game_id.set(1);
+        self.state.total_stake_pool.set(0);
     }
 
-    async fn execute_operation(&mut self, operation: Self::Operation) -> Result<(), Self::Error> {
+    async fn execute_operation(&mut self, operation: Self::Operation) -> Self::Response {
         let timestamp = self.runtime.system_time().micros();
         let caller = self.runtime.authenticated_signer()
             .map(|o| o.to_string())
-            .unwrap_or_default();
+            .unwrap_or_else(|| "anonymous".to_string());
 
         match operation {
-            Operation::Initialize { owner } => {
-                self.state.initialize(owner).await;
-                Ok(())
-            }
-
             Operation::CreateGame { stake, room_code } => {
-                // Verify caller has sufficient funds
-                let balance = self.runtime.owner_balance(Owner::from_str(&caller)?);
-                if balance < Amount::from_tokens(stake as u128) {
-                    return Err(ContractError::InsufficientFunds);
-                }
-
-                // Deduct stake from caller
-                self.runtime.transfer(
-                    Some(Owner::from_str(&caller)?),
-                    None, // Contract holds funds
-                    Amount::from_tokens(stake as u128),
-                )?;
+                // Get next game ID
+                let id = *self.state.next_game_id.get();
+                self.state.next_game_id.set(id + 1);
 
                 // Create game
-                let game_id = self.state.create_game(caller.clone(), stake, room_code.clone(), timestamp).await
-                    .map_err(|e| ContractError::StateError(e))?;
+                let game = Game::new(id, caller.clone(), stake, room_code.clone(), timestamp);
+                self.state.games.insert(&id, game).expect("Failed to insert game");
 
-                // Emit message
-                self.runtime.send_message(Message::GameCreated {
-                    game_id,
-                    creator: caller,
-                    stake,
-                    room_code,
-                });
+                // Update total stake pool
+                let current_pool = *self.state.total_stake_pool.get();
+                self.state.total_stake_pool.set(current_pool + stake);
 
-                Ok(())
+                id
             }
 
             Operation::JoinGame { game_id } => {
-                // Get game to check stake
-                let game = self.state.games.get(&game_id).await
-                    .map_err(|e| ContractError::StateError(e.to_string()))?
-                    .ok_or(ContractError::GameNotFound)?;
+                let mut game = self.state.games.get(&game_id)
+                    .await
+                    .expect("Failed to get game")
+                    .expect("Game not found");
 
-                let stake = game.stake;
-
-                // Verify caller has sufficient funds
-                let balance = self.runtime.owner_balance(Owner::from_str(&caller)?);
-                if balance < Amount::from_tokens(stake as u128) {
-                    return Err(ContractError::InsufficientFunds);
+                if !game.can_join() {
+                    return 0;
                 }
 
-                // Deduct stake from caller
-                self.runtime.transfer(
-                    Some(Owner::from_str(&caller)?),
-                    None,
-                    Amount::from_tokens(stake as u128),
-                )?;
+                if game.creator == caller {
+                    return 0; // Cannot join own game
+                }
 
-                // Join game
-                self.state.join_game(game_id, caller.clone(), timestamp).await
-                    .map_err(|e| ContractError::StateError(e))?;
+                game.opponent = Some(caller);
+                game.status = GameStatus::Active;
+                game.started_at = Some(timestamp);
 
-                // Emit message
-                self.runtime.send_message(Message::GameJoined {
-                    game_id,
-                    opponent: caller,
-                });
+                self.state.games.insert(&game_id, game.clone()).expect("Failed to update game");
 
-                Ok(())
+                // Update total stake pool
+                let current_pool = *self.state.total_stake_pool.get();
+                self.state.total_stake_pool.set(current_pool + game.stake);
+
+                game_id
             }
 
             Operation::SubmitResult {
@@ -192,70 +101,126 @@ impl Contract for AirHockeyContract {
                 player1_score,
                 player2_score,
             } => {
+                let mut game = self.state.games.get(&game_id)
+                    .await
+                    .expect("Failed to get game")
+                    .expect("Game not found");
+
+                if !game.is_active() {
+                    return 0;
+                }
+
                 // Verify caller is a participant
-                let game = self.state.games.get(&game_id).await
-                    .map_err(|e| ContractError::StateError(e.to_string()))?
-                    .ok_or(ContractError::GameNotFound)?;
-
                 if game.creator != caller && game.opponent.as_ref() != Some(&caller) {
-                    return Err(ContractError::NotAuthorized);
+                    return 0;
                 }
 
-                let total_pot = game.total_pot();
+                game.player1_score = player1_score;
+                game.player2_score = player2_score;
+                game.status = GameStatus::Completed;
+                game.ended_at = Some(timestamp);
 
-                // Submit result
-                let winner = self.state.submit_result(game_id, player1_score, player2_score, timestamp).await
-                    .map_err(|e| ContractError::StateError(e))?;
+                // Determine winner
+                game.winner = if player1_score > player2_score {
+                    Some(game.creator.clone())
+                } else if player2_score > player1_score {
+                    game.opponent.clone()
+                } else {
+                    None // Draw
+                };
 
-                // Transfer winnings to winner
-                if let Some(ref winner_addr) = winner {
-                    self.runtime.transfer(
-                        None, // From contract
-                        Some(Owner::from_str(winner_addr)?),
-                        Amount::from_tokens(total_pot),
-                    )?;
-                }
+                // Update player stats
+                self.update_player_stats(&game).await;
 
-                // Emit message
-                self.runtime.send_message(Message::GameCompleted {
-                    game_id,
-                    winner,
-                    player1_score,
-                    player2_score,
-                });
+                // Update total stake pool (remove both stakes)
+                let current_pool = *self.state.total_stake_pool.get();
+                self.state.total_stake_pool.set(current_pool.saturating_sub(game.total_pot()));
 
-                Ok(())
+                self.state.games.insert(&game_id, game).expect("Failed to update game");
+
+                game_id
             }
 
             Operation::CancelGame { game_id } => {
-                // Cancel and get refund
-                let refund = self.state.cancel_game(game_id, &caller, timestamp).await
-                    .map_err(|e| ContractError::StateError(e))?;
+                let mut game = self.state.games.get(&game_id)
+                    .await
+                    .expect("Failed to get game")
+                    .expect("Game not found");
 
-                // Refund stake to creator
-                self.runtime.transfer(
-                    None,
-                    Some(Owner::from_str(&caller)?),
-                    Amount::from_tokens(refund),
-                )?;
+                if game.status != GameStatus::Waiting {
+                    return 0; // Can only cancel waiting games
+                }
 
-                // Emit message
-                self.runtime.send_message(Message::GameCancelled { game_id });
+                if game.creator != caller {
+                    return 0; // Only creator can cancel
+                }
 
-                Ok(())
-            }
+                game.status = GameStatus::Cancelled;
+                game.ended_at = Some(timestamp);
 
-            Operation::ClaimWinnings { game_id } => {
-                // This is handled in SubmitResult for simplicity
-                // In a more complex system, you might separate claiming
-                Ok(())
+                // Update total stake pool
+                let current_pool = *self.state.total_stake_pool.get();
+                self.state.total_stake_pool.set(current_pool.saturating_sub(game.stake));
+
+                self.state.games.insert(&game_id, game).expect("Failed to update game");
+
+                game_id
             }
         }
     }
 
-    async fn execute_message(&mut self, message: Self::Message) -> Result<(), Self::Error> {
+    async fn execute_message(&mut self, _message: Self::Message) {
         // Handle cross-chain messages if needed
         // For now, messages are just notifications
-        Ok(())
+    }
+
+    async fn store(mut self) {
+        self.state.save().await.expect("Failed to save state");
+    }
+}
+
+impl AirHockeyContract {
+    /// Update player statistics after a game
+    async fn update_player_stats(&mut self, game: &Game) {
+        let opponent = match game.opponent.as_ref() {
+            Some(o) => o.clone(),
+            None => return,
+        };
+
+        // Update creator stats
+        let mut creator_stats = self.state.player_stats.get(&game.creator)
+            .await
+            .expect("Failed to get stats")
+            .unwrap_or_default();
+
+        creator_stats.games_played += 1;
+
+        if game.winner.as_ref() == Some(&game.creator) {
+            creator_stats.wins += 1;
+            creator_stats.tokens_won += game.stake;
+        } else if game.winner.is_some() {
+            creator_stats.losses += 1;
+            creator_stats.tokens_lost += game.stake;
+        }
+
+        self.state.player_stats.insert(&game.creator, creator_stats).expect("Failed to update stats");
+
+        // Update opponent stats
+        let mut opponent_stats = self.state.player_stats.get(&opponent)
+            .await
+            .expect("Failed to get stats")
+            .unwrap_or_default();
+
+        opponent_stats.games_played += 1;
+
+        if game.winner.as_ref() == Some(&opponent) {
+            opponent_stats.wins += 1;
+            opponent_stats.tokens_won += game.stake;
+        } else if game.winner.is_some() {
+            opponent_stats.losses += 1;
+            opponent_stats.tokens_lost += game.stake;
+        }
+
+        self.state.player_stats.insert(&opponent, opponent_stats).expect("Failed to update stats");
     }
 }

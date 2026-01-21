@@ -1,12 +1,12 @@
 'use client';
 
 /**
- * Logo - Animated cyber esports logo
+ * Logo - Theme-aware logo
  */
 
 import React from 'react';
 import Link from 'next/link';
-import { cyberTheme } from '@/lib/cyber/theme';
+import { useThemedStyles } from '@/lib/cyber/useThemedStyles';
 
 interface LogoProps {
   size?: 'sm' | 'md' | 'lg';
@@ -27,19 +27,20 @@ export function Logo({
   linkTo = '/',
   className = '',
 }: LogoProps) {
+  const theme = useThemedStyles();
   const sizes = sizeConfig[size];
 
   const content = (
     <div
       className={`inline-flex items-center gap-2 ${className}`}
-      style={{ fontFamily: cyberTheme.fonts.heading }}
+      style={{ fontFamily: theme.fonts.heading }}
     >
       {/* Icon */}
       <span
         className={`${sizes.icon} ${animated ? 'animate-pulse' : ''}`}
         style={{
-          color: cyberTheme.colors.primary,
-          textShadow: `0 0 10px ${cyberTheme.colors.primary}`,
+          color: theme.colors.primary,
+          textShadow: `0 0 10px ${theme.colors.primary}`,
         }}
       >
         ⚡
@@ -50,18 +51,18 @@ export function Logo({
         <span
           className={`${sizes.text} font-black tracking-wider uppercase`}
           style={{
-            color: cyberTheme.colors.text.primary,
-            textShadow: `0 0 10px ${cyberTheme.colors.primary}40`,
+            color: theme.colors.text.primary,
+            textShadow: `0 0 10px ${theme.colors.primary}40`,
           }}
         >
           AIR
-          <span style={{ color: cyberTheme.colors.primary }}> HOCKEY</span>
+          <span style={{ color: theme.colors.primary }}> HOCKEY</span>
         </span>
         <span
           className="text-xs tracking-[0.3em] uppercase"
-          style={{ color: cyberTheme.colors.text.muted }}
+          style={{ color: theme.colors.text.muted }}
         >
-          CYBER ESPORTS
+          {theme._theme.name.toUpperCase()}
         </span>
       </div>
     </div>

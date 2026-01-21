@@ -10,10 +10,9 @@
  * - Error state with retry option
  */
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { cyberTheme } from '@/lib/cyber/theme';
 import { CyberButton } from './CyberButton';
-import { isMetaMaskInstalled } from '@/lib/linera';
 
 interface WalletButtonProps {
   // Connection state
@@ -49,14 +48,6 @@ export function WalletButton({
   variant = 'full',
   className = '',
 }: WalletButtonProps) {
-  // Check MetaMask on client-side only to avoid hydration mismatch
-  const [metamaskInstalled, setMetamaskInstalled] = useState(true); // Default to true to show connect button
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    setMetamaskInstalled(isMetaMaskInstalled());
-  }, []);
 
   // Error state
   if (error) {
@@ -112,7 +103,39 @@ export function WalletButton({
   }
 
   // Connected state
-  if (isConnected && address) {
+  if (isConnected) {
+    // If no address, show a minimal connected indicator
+    if (!address) {
+      return (
+        <div
+          className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg ${className}`}
+          style={{
+            backgroundColor: cyberTheme.colors.bg.tertiary,
+            border: `1px solid ${cyberTheme.colors.success}`,
+          }}
+        >
+          <div
+            className="w-2 h-2 rounded-full animate-pulse"
+            style={{ backgroundColor: cyberTheme.colors.success }}
+          />
+          <span
+            className="text-sm"
+            style={{ color: cyberTheme.colors.success }}
+          >
+            Connected
+          </span>
+          <button
+            onClick={onDisconnect}
+            className="ml-1 opacity-50 hover:opacity-100 transition-opacity"
+            style={{ color: cyberTheme.colors.text.muted }}
+          >
+            ✕
+          </button>
+        </div>
+      );
+    }
+
+    // Connected with address
     if (variant === 'minimal') {
       return (
         <button
@@ -226,22 +249,6 @@ export function WalletButton({
   }
 
   // Disconnected state - show connect button
-  // Only show "Install MetaMask" after mounted to avoid hydration issues
-  if (mounted && !metamaskInstalled) {
-    return (
-      <a
-        href="https://metamask.io/download/"
-        target="_blank"
-        rel="noopener noreferrer"
-        className={className}
-      >
-        <CyberButton variant="secondary" size="md">
-          Install MetaMask
-        </CyberButton>
-      </a>
-    );
-  }
-
   return (
     <CyberButton
       variant="primary"
@@ -250,7 +257,7 @@ export function WalletButton({
       onClick={onConnect}
       className={className}
     >
-      Connect Wallet
+      Connect
     </CyberButton>
   );
 }

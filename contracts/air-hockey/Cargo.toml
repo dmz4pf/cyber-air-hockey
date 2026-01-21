@@ -6,13 +6,15 @@ description = "Linera smart contract for Air Hockey staked multiplayer games"
 license = "Apache-2.0"
 
 [dependencies]
-linera-sdk = { version = "0.12", features = ["wit-bindgen"] }
+linera-sdk = "0.15"
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0"
 async-trait = "0.1"
+# Exact version to match linera-sdk and avoid compatibility issues
+async-graphql = { version = "=7.0.17", default-features = false }
 
 [dev-dependencies]
-linera-sdk = { version = "0.12", features = ["test"] }
+linera-sdk = { version = "0.15", features = ["test"] }
 
 [[bin]]
 name = "air_hockey_contract"

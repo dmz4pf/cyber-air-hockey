@@ -1,0 +1,14 @@
+/Users/MAC/Desktop/dev/linera/air-hockey/contracts/air-hockey/target/release/deps/libserde-3d64effa8e806d5d.rmeta: /Users/MAC/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/MAC/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/MAC/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/MAC/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/MAC/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/MAC/Desktop/dev/linera/air-hockey/contracts/air-hockey/target/release/build/serde-ebb2d0cbc895ffaf/out/private.rs
+
+/Users/MAC/Desktop/dev/linera/air-hockey/contracts/air-hockey/target/release/deps/libserde-3d64effa8e806d5d.rlib: /Users/MAC/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/MAC/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/MAC/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/MAC/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/MAC/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/MAC/Desktop/dev/linera/air-hockey/contracts/air-hockey/target/release/build/serde-ebb2d0cbc895ffaf/out/private.rs
+
+/Users/MAC/Desktop/dev/linera/air-hockey/contracts/air-hockey/target/release/deps/serde-3d64effa8e806d5d.d: /Users/MAC/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/MAC/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/MAC/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/MAC/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/MAC/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/MAC/Desktop/dev/linera/air-hockey/contracts/air-hockey/target/release/build/serde-ebb2d0cbc895ffaf/out/private.rs
+
+/Users/MAC/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs:
+/Users/MAC/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs:
+/Users/MAC/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs:
+/Users/MAC/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs:
+/Users/MAC/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs:
+/Users/MAC/Desktop/dev/linera/air-hockey/contracts/air-hockey/target/release/build/serde-ebb2d0cbc895ffaf/out/private.rs:
+
+# env-dep:OUT_DIR=/Users/MAC/Desktop/dev/linera/air-hockey/contracts/air-hockey/target/release/build/serde-ebb2d0cbc895ffaf/out

@@ -3,13 +3,14 @@
 /**
  * JoinGameModal - Join an existing multiplayer game
  *
- * User enters a Game ID and signs blockchain transaction to join.
+ * User enters a Game ID and joins the game on Linera blockchain.
  * Connects to WebSocket room and transitions to ready state.
  */
 
 import React, { useState, useRef, useEffect } from 'react';
 import { cyberTheme } from '@/lib/cyber/theme';
-import { useWalletAuth } from '@/providers/WalletAuthProvider';
+import { useDynamicWallet } from '@/hooks/useDynamicWallet';
+import { useLineraGame } from '@/hooks/useLineraGame';
 import { useGameStore } from '@/stores/gameStore';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { isValidGameId, normalizeGameId } from '@/lib/cyber/gameId';
@@ -21,7 +22,7 @@ interface JoinGameModalProps {
   onClose: () => void;
 }
 
-type JoinState = 'idle' | 'validating' | 'signing' | 'connecting' | 'joining' | 'success' | 'error';
+type JoinState = 'idle' | 'validating' | 'joining' | 'connecting' | 'success' | 'error';
 
 export function JoinGameModal({ isOpen, onClose }: JoinGameModalProps) {
   const [gameIdInput, setGameIdInput] = useState('');
@@ -29,14 +30,14 @@ export function JoinGameModal({ isOpen, onClose }: JoinGameModalProps) {
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const { address, shortAddress, signMessage } = useWalletAuth();
+  const { address, shortAddress } = useDynamicWallet();
+  const { joinGame, isLoading } = useLineraGame();
   const joinMultiplayerGame = useGameStore((s) => s.joinMultiplayerGame);
   const setRoomId = useGameStore((s) => s.setRoomId);
 
   // WebSocket connection
   const {
     isConnected: wsConnected,
-    connectionStatus,
     roomId,
     error: wsError,
     connect,
@@ -58,14 +59,13 @@ export function JoinGameModal({ isOpen, onClose }: JoinGameModalProps) {
     if (state === 'connecting' && wsConnected && gameIdInput) {
       const normalizedId = normalizeGameId(gameIdInput);
       console.log('[JoinGameModal] WebSocket connected, joining room:', normalizedId);
-      setState('joining');
       joinRoom(normalizedId);
     }
   }, [state, wsConnected, gameIdInput, joinRoom]);
 
   // Handle room joined success
   useEffect(() => {
-    if (state === 'joining' && roomId) {
+    if (state === 'connecting' && roomId) {
       console.log('[JoinGameModal] Successfully joined room:', roomId);
 
       // For now, simulate getting creator wallet from "blockchain"
@@ -89,7 +89,7 @@ export function JoinGameModal({ isOpen, onClose }: JoinGameModalProps) {
 
   // Handle WebSocket errors
   useEffect(() => {
-    if (wsError && (state === 'connecting' || state === 'joining')) {
+    if (wsError && state === 'connecting') {
       setState('error');
       setError(wsError);
     }
@@ -122,15 +122,11 @@ export function JoinGameModal({ isOpen, onClose }: JoinGameModalProps) {
       return;
     }
 
-    setState('signing');
+    setState('joining');
 
     try {
-      // Create message to sign for blockchain transaction
-      const timestamp = Date.now();
-      const message = `Join Air Hockey Game\n\nGame ID: ${normalizedId}\nPlayer: ${address}\nTimestamp: ${timestamp}\n\nSign to join this game on the blockchain.`;
-
-      // Request wallet signature
-      await signMessage(message);
+      // Join game on Linera blockchain
+      await joinGame(normalizedId);
 
       // Connect to WebSocket
       setState('connecting');
@@ -142,7 +138,7 @@ export function JoinGameModal({ isOpen, onClose }: JoinGameModalProps) {
 
       if (err instanceof Error) {
         if (err.message.includes('rejected')) {
-          setError('Transaction rejected. Please try again.');
+          setError('Operation rejected. Please try again.');
         } else {
           setError(err.message);
         }
@@ -159,7 +155,7 @@ export function JoinGameModal({ isOpen, onClose }: JoinGameModalProps) {
   };
 
   const handleClose = () => {
-    if (state === 'signing' || state === 'connecting' || state === 'joining') return;
+    if (state === 'joining' || state === 'connecting') return;
 
     // Disconnect WebSocket if we started connecting
     if (wsConnected) {
@@ -170,7 +166,7 @@ export function JoinGameModal({ isOpen, onClose }: JoinGameModalProps) {
     onClose();
   };
 
-  const isProcessing = state === 'validating' || state === 'signing' || state === 'connecting' || state === 'joining';
+  const isProcessing = state === 'validating' || state === 'joining' || state === 'connecting' || isLoading;
   const canJoin = gameIdInput.length >= 9 && !isProcessing; // XXXX-XXXX = 9 chars
 
   return (
@@ -270,12 +266,12 @@ export function JoinGameModal({ isOpen, onClose }: JoinGameModalProps) {
           </div>
         )}
 
-        {state === 'signing' && (
+        {state === 'joining' && (
           <div
             className="text-center text-sm animate-pulse"
-            style={{ color: cyberTheme.colors.warning }}
+            style={{ color: cyberTheme.colors.info }}
           >
-            Please sign the transaction in your wallet...
+            Joining game on blockchain...
           </div>
         )}
 
@@ -285,15 +281,6 @@ export function JoinGameModal({ isOpen, onClose }: JoinGameModalProps) {
             style={{ color: cyberTheme.colors.info }}
           >
             Connecting to game server...
-          </div>
-        )}
-
-        {state === 'joining' && (
-          <div
-            className="text-center text-sm animate-pulse"
-            style={{ color: cyberTheme.colors.info }}
-          >
-            Joining game room...
           </div>
         )}
 
@@ -313,11 +300,10 @@ export function JoinGameModal({ isOpen, onClose }: JoinGameModalProps) {
             onClick={handleJoinGame}
             disabled={!canJoin || state === 'success'}
           >
-            {state === 'idle' && 'Join & Sign'}
+            {state === 'idle' && 'Join Game'}
             {state === 'validating' && 'Checking...'}
-            {state === 'signing' && 'Signing...'}
-            {state === 'connecting' && 'Connecting...'}
             {state === 'joining' && 'Joining...'}
+            {state === 'connecting' && 'Connecting...'}
             {state === 'success' && 'Success!'}
             {state === 'error' && 'Try Again'}
           </CyberButton>

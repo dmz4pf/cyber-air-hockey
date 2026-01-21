@@ -1,6 +1,16 @@
 import { ReactNode } from 'react';
 
-export type DesignId = 'neon-arcade' | 'minimalist' | 'retro-pixel' | 'ice-stadium' | 'cyber-esports';
+export type DesignId =
+  | 'neon-arcade'
+  | 'minimalist'
+  | 'retro-pixel'
+  | 'ice-stadium'
+  | 'cyber-esports'
+  | 'tokyo-drift'
+  | 'arctic-frost'
+  | 'molten-core'
+  | 'synthwave-sunset'
+  | 'midnight-club';
 
 export interface DesignConfig {
   id: DesignId;

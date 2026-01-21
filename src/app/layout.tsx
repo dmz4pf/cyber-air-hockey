@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter, Orbitron, Press_Start_2P, Bebas_Neue } from 'next/font/google';
+import { Inter, Orbitron, Press_Start_2P, Bebas_Neue, VT323, Space_Grotesk } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
 
@@ -9,24 +9,37 @@ const inter = Inter({
   variable: '--font-inter',
 });
 
-// Neon Arcade / Cyber Esports font
+// Arcade font
 const orbitron = Orbitron({
   subsets: ['latin'],
   variable: '--font-orbitron',
 });
 
-// Retro Pixel font
+// Arcade Classic font
 const pressStart = Press_Start_2P({
   subsets: ['latin'],
   weight: '400',
   variable: '--font-press-start',
 });
 
-// Ice Stadium font
+// Premium Gaming font
 const bebasNeue = Bebas_Neue({
   subsets: ['latin'],
   weight: '400',
   variable: '--font-bebas',
+});
+
+// Retro Gaming font (CRT terminal style)
+const vt323 = VT323({
+  subsets: ['latin'],
+  weight: '400',
+  variable: '--font-vt323',
+});
+
+// Electric Vibrant font
+const spaceGrotesk = Space_Grotesk({
+  subsets: ['latin'],
+  variable: '--font-space-grotesk',
 });
 
 export const metadata: Metadata = {
@@ -42,7 +55,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${inter.variable} ${orbitron.variable} ${pressStart.variable} ${bebasNeue.variable} font-sans antialiased`}
+        className={`${inter.variable} ${orbitron.variable} ${pressStart.variable} ${bebasNeue.variable} ${vt323.variable} ${spaceGrotesk.variable} font-sans antialiased`}
       >
         <Providers>{children}</Providers>
       </body>

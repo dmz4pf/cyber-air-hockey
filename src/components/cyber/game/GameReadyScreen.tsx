@@ -11,7 +11,7 @@
 import React, { useState, useEffect } from 'react';
 import { cyberTheme } from '@/lib/cyber/theme';
 import { useGameStore } from '@/stores/gameStore';
-import { useWalletAuth } from '@/providers/WalletAuthProvider';
+import { useDynamicWallet } from '@/hooks/useDynamicWallet';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { HUDPanel } from '../ui/HUDPanel';
 import { CyberButton } from '../ui/CyberButton';
@@ -23,7 +23,7 @@ interface GameReadyScreenProps {
 export function GameReadyScreen({ className = '' }: GameReadyScreenProps) {
   const [isReadyLocal, setIsReadyLocal] = useState(false);
 
-  const { shortAddress } = useWalletAuth();
+  const { shortAddress } = useDynamicWallet();
   const multiplayerGameInfo = useGameStore((s) => s.multiplayerGameInfo);
   const storeOpponentReady = useGameStore((s) => s.opponentReady);
   const setIsReady = useGameStore((s) => s.setIsReady);

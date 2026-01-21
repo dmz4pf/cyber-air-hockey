@@ -1,11 +1,12 @@
 'use client';
 
 /**
- * Cyber Esports Home Page
+ * Cyber Esports Home Page - Theme-aware
  */
 
 import React from 'react';
-import { cyberTheme } from '@/lib/cyber/theme';
+import Link from 'next/link';
+import { useThemedStyles } from '@/lib/cyber/useThemedStyles';
 import {
   HeroSection,
   ProfilePreview,
@@ -14,6 +15,8 @@ import {
 } from '@/components/cyber/home';
 
 export default function CyberHomePage() {
+  const theme = useThemedStyles();
+
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
@@ -21,6 +24,22 @@ export default function CyberHomePage() {
 
       {/* Content Section */}
       <section className="max-w-7xl mx-auto px-4 py-12">
+        {/* Theme Switcher Link */}
+        <div className="flex justify-center mb-8">
+          <Link
+            href="/theme-preview"
+            className="px-6 py-3 rounded-lg font-semibold uppercase tracking-wider transition-all hover:scale-105"
+            style={{
+              backgroundColor: `${theme.colors.primary}20`,
+              color: theme.colors.primary,
+              border: `1px solid ${theme.colors.primary}`,
+              fontFamily: theme.fonts.heading,
+            }}
+          >
+            Customize Theme
+          </Link>
+        </div>
+
         {/* Season Banner */}
         <SeasonBanner className="mb-8" />
 
@@ -38,8 +57,8 @@ export default function CyberHomePage() {
           <h2
             className="text-2xl font-bold text-center mb-8 uppercase tracking-wider"
             style={{
-              color: cyberTheme.colors.text.primary,
-              fontFamily: cyberTheme.fonts.heading,
+              color: theme.colors.text.primary,
+              fontFamily: theme.fonts.heading,
             }}
           >
             Features
@@ -71,23 +90,23 @@ export default function CyberHomePage() {
                 key={i}
                 className="p-6 rounded-lg text-center"
                 style={{
-                  backgroundColor: cyberTheme.colors.bg.panel,
-                  border: `1px solid ${cyberTheme.colors.border.default}`,
+                  backgroundColor: theme.colors.bg.panel,
+                  border: `1px solid ${theme.colors.border.default}`,
                 }}
               >
                 <div className="text-4xl mb-4">{feature.icon}</div>
                 <h3
                   className="text-lg font-bold mb-2"
                   style={{
-                    color: cyberTheme.colors.text.primary,
-                    fontFamily: cyberTheme.fonts.heading,
+                    color: theme.colors.text.primary,
+                    fontFamily: theme.fonts.heading,
                   }}
                 >
                   {feature.title}
                 </h3>
                 <p
                   className="text-sm"
-                  style={{ color: cyberTheme.colors.text.secondary }}
+                  style={{ color: theme.colors.text.secondary }}
                 >
                   {feature.description}
                 </p>

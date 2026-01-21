@@ -8,7 +8,6 @@
 
 import { USE_MOCK_CLIENT, logConfig } from './config';
 import { MockLineraClient, getLineraClient as getMockClient } from './client';
-import { ProductionLineraClient, getProductionLineraClient } from './real-client';
 import type { LineraClient, WalletState } from './types';
 
 // Log configuration on module load (development only)
@@ -59,10 +58,10 @@ export {
 
 // Export individual client classes
 export { MockLineraClient } from './client';
-export { ProductionLineraClient } from './real-client';
 
-// Legacy export for backwards compatibility
-export { RealLineraClient } from './linera-client';
+// NOTE: ProductionLineraClient, RealLineraClient, LineraAdapter, and DynamicSigner
+// are NOT exported statically because they import @linera/client which is a WASM module.
+// Use the lazy loaders below instead.
 
 /**
  * Get the Linera client instance
@@ -91,11 +90,9 @@ export function getLineraClient(): LineraClient & {
     }
   }
 
-  if (USE_MOCK_CLIENT) {
-    return getMockClient();
-  }
-
-  return getProductionLineraClient();
+  // Always return mock client for now
+  // Production client requires @linera/client WASM which needs special handling
+  return getMockClient();
 }
 
 /**
@@ -117,11 +114,4 @@ export function getClientType(): 'mock' | 'production' {
  */
 export function getMockLineraClient(): MockLineraClient {
   return getMockClient();
-}
-
-/**
- * Force get production client
- */
-export function getRealLineraClient(): ProductionLineraClient {
-  return getProductionLineraClient();
 }

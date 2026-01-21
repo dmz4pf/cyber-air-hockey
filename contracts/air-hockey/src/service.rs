@@ -6,20 +6,16 @@
 
 mod state;
 
-use async_graphql::{EmptySubscription, Object, Schema, SimpleObject};
+use async_graphql::{EmptyMutation, EmptySubscription, Object, Schema, SimpleObject};
 use linera_sdk::{
-    base::WithServiceAbi,
-    views::{View, ViewStorageContext},
+    abi::WithServiceAbi,
+    views::{RootView, View},
     Service, ServiceRuntime,
 };
 use serde::{Deserialize, Serialize};
 
+use air_hockey::AirHockeyAbi;
 use crate::state::{AirHockeyState, Game, GameStatus, PlayerStats};
-
-/// GraphQL query root
-pub struct QueryRoot {
-    state: AirHockeyState,
-}
 
 /// Game info for GraphQL responses
 #[derive(SimpleObject, Debug, Clone, Serialize, Deserialize)]
@@ -94,93 +90,70 @@ pub struct GamesResponse {
     pub total: u64,
 }
 
-#[Object]
-impl QueryRoot {
-    /// Get a specific game by ID
-    async fn game(&self, id: u64) -> Option<GameInfo> {
-        self.state.games.get(&id).await.ok().flatten().map(Into::into)
-    }
-
-    /// Get all open games (waiting for opponent)
-    async fn open_games(&self) -> GamesResponse {
-        let games = self.state.get_open_games().await.unwrap_or_default();
-        let total = games.len() as u64;
-        GamesResponse {
-            games: games.into_iter().map(Into::into).collect(),
-            total,
-        }
-    }
-
-    /// Get games for a specific player
-    async fn player_games(&self, player: String) -> GamesResponse {
-        let games = self.state.get_player_games(&player).await.unwrap_or_default();
-        let total = games.len() as u64;
-        GamesResponse {
-            games: games.into_iter().map(Into::into).collect(),
-            total,
-        }
-    }
-
-    /// Get player statistics
-    async fn player_stats(&self, player: String) -> Option<PlayerStatsInfo> {
-        self.state.player_stats.get(&player).await.ok().flatten().map(Into::into)
-    }
-
-    /// Get total stake pool
-    async fn total_stake_pool(&self) -> String {
-        self.state.total_stake_pool.get().to_string()
-    }
-
-    /// Get next game ID (useful for UI)
-    async fn next_game_id(&self) -> u64 {
-        *self.state.next_game_id.get()
-    }
-
-    /// Get contract owner
-    async fn owner(&self) -> String {
-        self.state.owner.get().clone()
-    }
-}
-
 pub struct AirHockeyService {
     state: AirHockeyState,
+    runtime: ServiceRuntime<Self>,
 }
 
 linera_sdk::service!(AirHockeyService);
 
 impl WithServiceAbi for AirHockeyService {
-    type Abi = air_hockey::AirHockeyAbi;
+    type Abi = AirHockeyAbi;
 }
 
 impl Service for AirHockeyService {
-    type Error = ();
-    type Storage = ViewStorageContext;
-    type State = AirHockeyState;
+    type Parameters = ();
 
-    async fn new(state: Self::State, _runtime: ServiceRuntime<Self>) -> Result<Self, Self::Error> {
-        Ok(Self { state })
+    async fn new(runtime: ServiceRuntime<Self>) -> Self {
+        let state = AirHockeyState::load(runtime.root_view_storage_context())
+            .await
+            .expect("Failed to load state");
+        Self { state, runtime }
     }
 
-    async fn handle_query(&self, query: Self::Query) -> Result<Self::QueryResponse, Self::Error> {
+    async fn handle_query(&self, query: Self::Query) -> Self::QueryResponse {
         let schema = Schema::build(
-            QueryRoot { state: self.state.clone() },
+            QueryRoot::new(&self.state),
             EmptyMutation,
             EmptySubscription,
         )
         .finish();
 
-        let response = schema.execute(query).await;
-        Ok(response)
+        schema.execute(query).await
     }
 }
 
-/// Empty mutation type (all mutations go through operations)
-pub struct EmptyMutation;
+/// GraphQL query root - snapshot the data for query execution
+pub struct QueryRoot {
+    next_game_id: u64,
+    owner: String,
+    total_stake_pool: u64,
+}
+
+impl QueryRoot {
+    fn new(state: &AirHockeyState) -> Self {
+        Self {
+            next_game_id: *state.next_game_id.get(),
+            owner: state.owner.get().clone(),
+            total_stake_pool: *state.total_stake_pool.get(),
+        }
+    }
+}
 
 #[Object]
-impl EmptyMutation {
-    /// Placeholder - all mutations are done through contract operations
-    async fn _placeholder(&self) -> bool {
-        true
+impl QueryRoot {
+    /// Get total stake pool
+    async fn total_stake_pool(&self) -> String {
+        self.total_stake_pool.to_string()
+    }
+
+    /// Get next game ID (useful for UI)
+    async fn next_game_id(&self) -> u64 {
+        self.next_game_id
+    }
+
+    /// Get contract owner
+    async fn owner(&self) -> String {
+        self.owner.clone()
     }
 }

@@ -1,11 +1,11 @@
 'use client';
 
 /**
- * StatusBadge - LIVE, RANKED, CASUAL, and other status badges
+ * StatusBadge - Theme-aware status badges
  */
 
 import React from 'react';
-import { cyberTheme } from '@/lib/cyber/theme';
+import { useThemedStyles } from '@/lib/cyber/useThemedStyles';
 
 type BadgeStatus = 'live' | 'ranked' | 'casual' | 'online' | 'offline' | 'away' | 'custom';
 
@@ -24,16 +24,6 @@ const sizeConfig = {
   lg: 'px-3 py-1 text-sm',
 };
 
-const statusConfig: Record<BadgeStatus, { color: string; text: string }> = {
-  live: { color: '#ef4444', text: 'LIVE' },
-  ranked: { color: '#8b5cf6', text: 'RANKED' },
-  casual: { color: '#6366f1', text: 'CASUAL' },
-  online: { color: '#22c55e', text: 'ONLINE' },
-  offline: { color: '#64748b', text: 'OFFLINE' },
-  away: { color: '#fbbf24', text: 'AWAY' },
-  custom: { color: '#8b5cf6', text: '' },
-};
-
 export function StatusBadge({
   status,
   customText,
@@ -42,6 +32,19 @@ export function StatusBadge({
   pulse = false,
   className = '',
 }: StatusBadgeProps) {
+  const theme = useThemedStyles();
+
+  // Theme-aware status colors (no purple)
+  const statusConfig: Record<BadgeStatus, { color: string; text: string }> = {
+    live: { color: theme.colors.error, text: 'LIVE' },
+    ranked: { color: theme.colors.primary, text: 'RANKED' },
+    casual: { color: theme.colors.info, text: 'CASUAL' },
+    online: { color: theme.colors.success, text: 'ONLINE' },
+    offline: { color: theme.colors.text.muted, text: 'OFFLINE' },
+    away: { color: theme.colors.warning, text: 'AWAY' },
+    custom: { color: theme.colors.primary, text: '' },
+  };
+
   const config = statusConfig[status];
   const color = customColor || config.color;
   const text = customText || config.text;
@@ -55,7 +58,7 @@ export function StatusBadge({
         backgroundColor: `${color}20`,
         border: `1px solid ${color}50`,
         color,
-        fontFamily: cyberTheme.fonts.heading,
+        fontFamily: theme.fonts.heading,
       }}
     >
       {/* Pulse dot */}

@@ -1,13 +1,13 @@
 'use client';
 
 /**
- * TopNavBar - Main navigation bar
+ * TopNavBar - Theme-aware navigation bar
  */
 
 import React, { useState } from 'react';
-import { cyberTheme } from '@/lib/cyber/theme';
+import { useThemedStyles } from '@/lib/cyber/useThemedStyles';
 import { usePlayerStore } from '@/stores/playerStore';
-import { useWalletAuth } from '@/providers/WalletAuthProvider';
+import { useLinera } from '@/providers/LineraDirectProvider';
 import { Logo } from './Logo';
 import { NavLinks } from './NavLinks';
 import { RankBadge } from '../ui/RankBadge';
@@ -20,27 +20,32 @@ interface TopNavBarProps {
 export function TopNavBar({ className = '' }: TopNavBarProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const profile = usePlayerStore((state) => state.profile);
+  const theme = useThemedStyles();
 
-  // Wallet state from WalletAuthProvider
+  // Wallet state from useLinera
   const {
     isConnected,
     isConnecting,
-    address,
-    shortAddress,
+    walletAddress,
+    balanceFormatted,
     connect,
     disconnect,
-  } = useWalletAuth();
+  } = useLinera();
 
-  // Note: Balance display disabled - would need to fetch from chain
-  const balance = null;
+  // Derive address display values
+  const address = walletAddress;
+  const shortAddress = walletAddress
+    ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
+    : null;
+  const balance = balanceFormatted?.formatted || null;
 
   return (
     <header
       className={`fixed top-0 left-0 right-0 z-40 ${className}`}
       style={{
-        backgroundColor: `${cyberTheme.colors.bg.primary}95`,
+        backgroundColor: `${theme.colors.bg.primary}95`,
         backdropFilter: 'blur(10px)',
-        borderBottom: `1px solid ${cyberTheme.colors.border.subtle}`,
+        borderBottom: `1px solid ${theme.colors.border.subtle}`,
       }}
     >
       <div className="max-w-7xl mx-auto px-4">
@@ -71,15 +76,15 @@ export function TopNavBar({ className = '' }: TopNavBarProps) {
                   <div
                     className="text-sm font-bold"
                     style={{
-                      color: cyberTheme.colors.text.primary,
-                      fontFamily: cyberTheme.fonts.heading,
+                      color: theme.colors.text.primary,
+                      fontFamily: theme.fonts.heading,
                     }}
                   >
                     {profile.username}
                   </div>
                   <div
                     className="text-xs"
-                    style={{ color: cyberTheme.colors.text.muted }}
+                    style={{ color: theme.colors.text.muted }}
                   >
                     Lv. {profile.level.current}
                   </div>
@@ -93,7 +98,7 @@ export function TopNavBar({ className = '' }: TopNavBarProps) {
           <button
             className="md:hidden p-2"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            style={{ color: cyberTheme.colors.text.primary }}
+            style={{ color: theme.colors.text.primary }}
           >
             <svg
               className="w-6 h-6"
@@ -124,14 +129,14 @@ export function TopNavBar({ className = '' }: TopNavBarProps) {
         {isMobileMenuOpen && (
           <div
             className="md:hidden py-4 border-t"
-            style={{ borderColor: cyberTheme.colors.border.subtle }}
+            style={{ borderColor: theme.colors.border.subtle }}
           >
             <NavLinks direction="vertical" />
 
             {/* Wallet Connection (mobile) */}
             <div
               className="mt-4 pt-4 border-t"
-              style={{ borderColor: cyberTheme.colors.border.subtle }}
+              style={{ borderColor: theme.colors.border.subtle }}
             >
               <WalletButton
                 isConnected={isConnected}
@@ -149,22 +154,22 @@ export function TopNavBar({ className = '' }: TopNavBarProps) {
             {profile && (
               <div
                 className="flex items-center gap-3 mt-4 pt-4 border-t"
-                style={{ borderColor: cyberTheme.colors.border.subtle }}
+                style={{ borderColor: theme.colors.border.subtle }}
               >
                 <RankBadge rank={profile.rank} size="sm" />
                 <div>
                   <div
                     className="text-sm font-bold"
                     style={{
-                      color: cyberTheme.colors.text.primary,
-                      fontFamily: cyberTheme.fonts.heading,
+                      color: theme.colors.text.primary,
+                      fontFamily: theme.fonts.heading,
                     }}
                   >
                     {profile.username}
                   </div>
                   <div
                     className="text-xs"
-                    style={{ color: cyberTheme.colors.text.muted }}
+                    style={{ color: theme.colors.text.muted }}
                   >
                     Level {profile.level.current}
                   </div>

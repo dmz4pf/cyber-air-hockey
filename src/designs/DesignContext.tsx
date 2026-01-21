@@ -9,6 +9,11 @@ import { minimalistConfig } from './minimalist/config';
 import { retroPixelConfig } from './retro-pixel/config';
 import { iceStadiumConfig } from './ice-stadium/config';
 import { cyberEsportsConfig } from './cyber-esports/config';
+import { tokyoDriftConfig } from './tokyo-drift/config';
+import { arcticFrostConfig } from './arctic-frost/config';
+import { moltenCoreConfig } from './molten-core/config';
+import { synthwaveSunsetConfig } from './synthwave-sunset/config';
+import { midnightClubConfig } from './midnight-club/config';
 
 const designConfigs: Record<DesignId, DesignConfig> = {
   'neon-arcade': neonArcadeConfig,
@@ -16,6 +21,11 @@ const designConfigs: Record<DesignId, DesignConfig> = {
   'retro-pixel': retroPixelConfig,
   'ice-stadium': iceStadiumConfig,
   'cyber-esports': cyberEsportsConfig,
+  'tokyo-drift': tokyoDriftConfig,
+  'arctic-frost': arcticFrostConfig,
+  'molten-core': moltenCoreConfig,
+  'synthwave-sunset': synthwaveSunsetConfig,
+  'midnight-club': midnightClubConfig,
 };
 
 interface DesignContextType {

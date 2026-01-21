@@ -4,13 +4,13 @@
  * MultiplayerLobbyScreen - Create or Join game options
  *
  * Shows connected wallet and options to create or join a game.
- * Both require blockchain transaction signing.
+ * Both options interact with the Linera blockchain.
  */
 
 import React, { useState } from 'react';
 import { cyberTheme } from '@/lib/cyber/theme';
 import { useGameStore } from '@/stores/gameStore';
-import { useWalletAuth } from '@/providers/WalletAuthProvider';
+import { useDynamicWallet } from '@/hooks/useDynamicWallet';
 import { HUDPanel } from '../ui/HUDPanel';
 import { CyberButton } from '../ui/CyberButton';
 import { CreateGameModal } from './CreateGameModal';
@@ -25,7 +25,7 @@ export function MultiplayerLobbyScreen({ className = '' }: MultiplayerLobbyScree
   const [showJoinModal, setShowJoinModal] = useState(false);
 
   const goToModeSelection = useGameStore((state) => state.goToModeSelection);
-  const { address, shortAddress } = useWalletAuth();
+  const { shortAddress } = useDynamicWallet();
 
   return (
     <>
@@ -255,7 +255,7 @@ export function MultiplayerLobbyScreen({ className = '' }: MultiplayerLobbyScree
           >
             <p style={{ color: cyberTheme.colors.text.secondary }}>
               <span style={{ color: cyberTheme.colors.info }}>Note:</span> Both creating and joining
-              a game requires signing a blockchain transaction with your wallet.
+              a game registers the action on the Linera blockchain.
             </p>
           </div>
 

@@ -1,295 +1,431 @@
 'use client';
 
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { useGameStore } from '@/stores/gameStore';
-import { useWebSocket } from './useWebSocket';
-import { useInterpolation, usePaddleInterpolation } from './useInterpolation';
-import {
-  createGameEngine,
-  updatePhysics,
-  GameEngine,
-  GameBodies,
-} from '@/lib/physics/engine';
-import { PHYSICS_CONFIG } from '@/lib/physics/config';
-import type { Player, Scores } from '@/types/game';
 
-const PUCK_SYNC_RATE = 33; // Send puck state every 33ms (~30Hz)
+// =============================================================================
+// Types
+// =============================================================================
 
-interface UseMultiplayerGameOptions {
-  onOpponentLeft?: () => void;
+interface ServerGameState {
+  puck: { x: number; y: number; vx: number; vy: number };
+  paddle1: { x: number; y: number };
+  paddle2: { x: number; y: number };
+  score: { player1: number; player2: number };
 }
 
-export function useMultiplayerGame(options: UseMultiplayerGameOptions = {}) {
-  const { onOpponentLeft } = options;
+type GameStatus = 'waiting' | 'countdown' | 'playing' | 'ended';
 
-  const gameEngineRef = useRef<GameEngine | null>(null);
-  const frameRef = useRef<number>(0);
-  const lastTimeRef = useRef<number>(0);
-  const puckSeqRef = useRef<number>(0);
-  const lastPuckSyncRef = useRef<number>(0);
+interface UseMultiplayerGameResult {
+  // Connection state
+  isConnected: boolean;
+  isConnecting: boolean;
+  connectionError: string | null;
 
-  // Game store
-  const status = useGameStore((state) => state.status);
-  const mode = useGameStore((state) => state.mode);
-  const playerNumber = useGameStore((state) => state.playerNumber);
-  const isHost = useGameStore((state) => state.isHost);
-  const roomId = useGameStore((state) => state.roomId);
-  const lastScorer = useGameStore((state) => state.lastScorer);
-  const scores = useGameStore((state) => state.scores);
-  const maxScore = useGameStore((state) => state.maxScore);
-  const scoreGoal = useGameStore((state) => state.scoreGoal);
-  const resumeAfterGoal = useGameStore((state) => state.resumeAfterGoal);
-  const setMultiplayerScores = useGameStore((state) => state.setMultiplayerScores);
+  // Game state
+  gameState: ServerGameState | null;
+  playerNumber: 1 | 2 | null;
+  opponentJoined: boolean;
+  countdown: number | null;
+  gameStatus: GameStatus;
+  winner: 1 | 2 | null;
 
-  // Interpolation hooks
-  const puckInterpolation = useInterpolation({ delayMs: 50 });
-  const opponentPaddleInterpolation = usePaddleInterpolation(0.25);
+  // Actions
+  sendPaddleMove: (x: number, y: number) => void;
+  disconnect: () => void;
+}
 
-  // Track if we're in multiplayer mode
-  const isMultiplayer = mode === 'multiplayer' && roomId !== null;
+// Server message types (must match server's message-types.ts)
+type ServerMessage =
+  | { type: 'room-joined'; gameId: string; playerNumber: 1 | 2 }
+  | { type: 'opponent-joined'; opponentId: string }
+  | { type: 'opponent-disconnected' }
+  | { type: 'countdown'; seconds: number }
+  | { type: 'state-update'; puck: ServerGameState['puck']; paddle1: ServerGameState['paddle1']; paddle2: ServerGameState['paddle2']; score: ServerGameState['score']; timestamp: number }
+  | { type: 'goal'; scorer: 1 | 2; newScore: { player1: number; player2: number } }
+  | { type: 'game-over'; winner: 1 | 2; finalScore: { player1: number; player2: number } }
+  | { type: 'error'; code: string; message: string }
+  | { type: 'pong' };
 
-  // WebSocket handlers
-  const handlePuckUpdate = useCallback(
-    (state: { x: number; y: number; vx: number; vy: number; seq: number }) => {
-      if (!isHost) {
-        puckInterpolation.addSnapshot(state);
-      }
-    },
-    [isHost, puckInterpolation]
-  );
+// =============================================================================
+// WebSocket URL
+// =============================================================================
 
-  const handleOpponentPaddle = useCallback(
-    (state: { x: number; y: number }) => {
-      opponentPaddleInterpolation.setTarget(state.x, state.y);
-    },
-    [opponentPaddleInterpolation]
-  );
+const WS_URL = typeof window !== 'undefined'
+  ? (process.env.NEXT_PUBLIC_WS_URL || `ws://${window.location.hostname}:3001/ws`)
+  : 'ws://localhost:3001/ws';
+const THROTTLE_MS = 16; // 60fps
 
-  const handleGameStart = useCallback(
-    (num: 1 | 2) => {
-      // Game store is already updated by MultiplayerLobby
-      // Clear interpolation buffers
-      puckInterpolation.clear();
-      opponentPaddleInterpolation.clear();
-      puckSeqRef.current = 0;
-    },
-    [puckInterpolation, opponentPaddleInterpolation]
-  );
+// =============================================================================
+// Hook Implementation
+// =============================================================================
 
-  const handleGoalConfirmed = useCallback(
-    (scorer: 'player1' | 'player2', newScores: Scores) => {
-      // Server is authoritative on scores in multiplayer
-      setMultiplayerScores(newScores);
-    },
-    [setMultiplayerScores]
-  );
+export function useMultiplayerGame(
+  gameId: string,
+  playerId: string
+): UseMultiplayerGameResult {
+  // Connection state
+  const [isConnected, setIsConnected] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
-  const handleGameOver = useCallback(
-    (winner: 'player1' | 'player2', finalScores: Scores) => {
-      setMultiplayerScores(finalScores);
-    },
-    [setMultiplayerScores]
-  );
+  // Game state
+  const [gameState, setGameState] = useState<ServerGameState | null>(null);
+  const [playerNumber, setPlayerNumber] = useState<1 | 2 | null>(null);
+  const [opponentJoined, setOpponentJoined] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [gameStatus, setGameStatus] = useState<GameStatus>('waiting');
+  const [winner, setWinner] = useState<1 | 2 | null>(null);
 
-  const handleOpponentLeftCallback = useCallback(() => {
-    puckInterpolation.clear();
-    opponentPaddleInterpolation.clear();
-    onOpponentLeft?.();
-  }, [puckInterpolation, opponentPaddleInterpolation, onOpponentLeft]);
+  // Refs to avoid re-renders and stale closures
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectAttemptRef = useRef(0);
+  const gameStatusRef = useRef<GameStatus>('waiting');
+  const lastPaddleSendRef = useRef(0);
 
-  // WebSocket hook
-  const ws = useWebSocket({
-    autoConnect: isMultiplayer,
-    onPuckUpdate: handlePuckUpdate,
-    onOpponentPaddle: handleOpponentPaddle,
-    onGameStart: handleGameStart,
-    onGoalConfirmed: handleGoalConfirmed,
-    onGameOver: handleGameOver,
-    onOpponentLeft: handleOpponentLeftCallback,
-  });
+  // Heartbeat refs
+  const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastPongRef = useRef<number>(Date.now());
 
-  // Initialize engine
+  // Trailing throttle refs
+  const pendingMoveRef = useRef<{ x: number; y: number } | null>(null);
+  const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Connection timeout ref
+  const connectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Keep gameStatusRef in sync
   useEffect(() => {
-    const handleGoal = (scorer: Player) => {
-      if (isMultiplayer) {
-        // In multiplayer, only host reports goals
-        if (isHost) {
-          ws.sendGoal(scorer);
+    gameStatusRef.current = gameStatus;
+  }, [gameStatus]);
+
+  // Heartbeat functions
+  const stopHeartbeat = useCallback(() => {
+    if (heartbeatIntervalRef.current) {
+      clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = null;
+    }
+  }, []);
+
+  const startHeartbeat = useCallback(() => {
+    stopHeartbeat(); // Clear any existing
+
+    heartbeatIntervalRef.current = setInterval(() => {
+      // Check if we've received a pong recently (within 30s)
+      if (Date.now() - lastPongRef.current > 30000) {
+        console.warn('[WebSocket] No pong received in 30s, connection may be stale');
+        // Force reconnect
+        if (wsRef.current) {
+          wsRef.current.close(4001, 'Heartbeat timeout');
         }
-        // Don't call scoreGoal directly - wait for server confirmation
+        return;
+      }
+
+      // Send ping
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: 'ping' }));
+      }
+    }, 15000); // Every 15 seconds
+  }, [stopHeartbeat]);
+
+  // Cleanup function
+  const cleanup = useCallback(() => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+    if (throttleTimeoutRef.current) {
+      clearTimeout(throttleTimeoutRef.current);
+      throttleTimeoutRef.current = null;
+    }
+    if (connectionTimeoutRef.current) {
+      clearTimeout(connectionTimeoutRef.current);
+      connectionTimeoutRef.current = null;
+    }
+    stopHeartbeat();
+    if (wsRef.current) {
+      wsRef.current.onopen = null;
+      wsRef.current.onmessage = null;
+      wsRef.current.onerror = null;
+      wsRef.current.onclose = null;
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+  }, [stopHeartbeat]);
+
+  // Send message helper
+  const sendMessage = useCallback((message: object) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify(message));
+    }
+  }, []);
+
+  // Throttled paddle move with trailing send (60fps = 16ms)
+  const sendPaddleMove = useCallback(
+    (x: number, y: number) => {
+      const now = Date.now();
+      const timeSinceLastSend = now - lastPaddleSendRef.current;
+
+      if (timeSinceLastSend >= THROTTLE_MS) {
+        // Can send immediately
+        lastPaddleSendRef.current = now;
+        sendMessage({ type: 'paddle-move', x, y, timestamp: now });
+        pendingMoveRef.current = null;
+
+        // Clear any pending trailing send
+        if (throttleTimeoutRef.current) {
+          clearTimeout(throttleTimeoutRef.current);
+          throttleTimeoutRef.current = null;
+        }
       } else {
-        // Single player mode
-        scoreGoal(scorer);
-      }
-    };
+        // Store for trailing send
+        pendingMoveRef.current = { x, y };
 
-    const gameEngine = createGameEngine({
-      onGoal: handleGoal,
-      onPaddleHit: () => {},
-      onWallHit: () => {},
-    });
-
-    gameEngineRef.current = gameEngine;
-
-    return () => {
-      gameEngine.cleanup();
-    };
-  }, [isMultiplayer, isHost, scoreGoal, ws]);
-
-  // Handle goal pause and reset
-  useEffect(() => {
-    if (status === 'goal') {
-      const timer = setTimeout(() => {
-        if (gameEngineRef.current) {
-          const serveToward = lastScorer === 'player1' ? 'player2' : 'player1';
-          gameEngineRef.current.resetPuck({
-            serveToward,
-            isGameStart: false,
-          });
-
-          // Clear puck interpolation buffer on reset
-          if (!isHost) {
-            puckInterpolation.clear();
-          }
+        // Set up trailing send if not already scheduled
+        if (!throttleTimeoutRef.current) {
+          const remainingTime = THROTTLE_MS - timeSinceLastSend;
+          throttleTimeoutRef.current = setTimeout(() => {
+            if (pendingMoveRef.current) {
+              const ts = Date.now();
+              lastPaddleSendRef.current = ts;
+              sendMessage({
+                type: 'paddle-move',
+                ...pendingMoveRef.current,
+                timestamp: ts
+              });
+              pendingMoveRef.current = null;
+            }
+            throttleTimeoutRef.current = null;
+          }, remainingTime);
         }
-        resumeAfterGoal();
-      }, PHYSICS_CONFIG.game.goalPauseMs);
-
-      return () => clearTimeout(timer);
-    }
-  }, [status, lastScorer, resumeAfterGoal, isHost, puckInterpolation]);
-
-  // Reset puck when game starts
-  useEffect(() => {
-    if (status === 'playing' && gameEngineRef.current) {
-      const store = useGameStore.getState();
-      if (store.scores.player1 === 0 && store.scores.player2 === 0) {
-        gameEngineRef.current.resetPuck({ isGameStart: true });
-        puckInterpolation.clear();
-        opponentPaddleInterpolation.clear();
-        puckSeqRef.current = 0;
       }
-    }
-  }, [status, puckInterpolation, opponentPaddleInterpolation]);
+    },
+    [sendMessage]
+  );
 
-  // Game loop
+  // Disconnect function
+  const disconnect = useCallback(() => {
+    cleanup();
+    setIsConnected(false);
+    setIsConnecting(false);
+    setGameStatus('ended');
+    gameStatusRef.current = 'ended';
+  }, [cleanup]);
+
+  // Connect to WebSocket
   useEffect(() => {
-    if (status !== 'playing') {
-      lastTimeRef.current = 0;
+    if (!gameId || !playerId) {
       return;
     }
 
-    const gameLoop = (currentTime: number) => {
-      if (lastTimeRef.current === 0) {
-        lastTimeRef.current = currentTime;
-      }
+    let isMounted = true; // Guard for state updates
 
-      const delta = Math.min(currentTime - lastTimeRef.current, 32);
-      lastTimeRef.current = currentTime;
+    const connect = () => {
+      if (!isMounted) return;
 
-      if (gameEngineRef.current) {
-        // In multiplayer:
-        // - Host runs physics and sends puck state
-        // - Client uses interpolated puck position
-        if (!isMultiplayer || isHost) {
-          updatePhysics(gameEngineRef.current.engine, delta);
+      setIsConnecting(true);
+      setConnectionError(null);
 
-          // Host sends puck state at sync rate
-          if (isMultiplayer && isHost) {
-            const now = Date.now();
-            if (now - lastPuckSyncRef.current >= PUCK_SYNC_RATE) {
-              const puck = gameEngineRef.current.bodies.puck;
-              ws.sendPuck(
-                puck.position.x,
-                puck.position.y,
-                puck.velocity.x,
-                puck.velocity.y,
-                puckSeqRef.current++
+      const ws = new WebSocket(WS_URL);
+      wsRef.current = ws;
+
+      // Connection timeout
+      connectionTimeoutRef.current = setTimeout(() => {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.CONNECTING) {
+          setConnectionError('Connection timed out');
+          wsRef.current.close();
+        }
+      }, 10000);
+
+      ws.onopen = () => {
+        if (!isMounted) {
+          ws.close();
+          return;
+        }
+
+        // Clear connection timeout
+        if (connectionTimeoutRef.current) {
+          clearTimeout(connectionTimeoutRef.current);
+          connectionTimeoutRef.current = null;
+        }
+
+        setIsConnected(true);
+        setIsConnecting(false);
+        setConnectionError(null);
+        reconnectAttemptRef.current = 0;
+
+        // Send join-room message
+        ws.send(
+          JSON.stringify({
+            type: 'join-room',
+            gameId,
+            playerId,
+          })
+        );
+
+        // Start heartbeat
+        startHeartbeat();
+      };
+
+      ws.onmessage = (event) => {
+        if (!isMounted) return;
+
+        try {
+          const message = JSON.parse(event.data) as ServerMessage;
+
+          switch (message.type) {
+            case 'room-joined':
+              setPlayerNumber(message.playerNumber);
+              setGameStatus('waiting');
+              gameStatusRef.current = 'waiting';
+              break;
+
+            case 'opponent-joined':
+              setOpponentJoined(true);
+              break;
+
+            case 'opponent-disconnected':
+              setOpponentJoined(false);
+              setGameStatus('waiting');
+              gameStatusRef.current = 'waiting';
+              setCountdown(null);
+              break;
+
+            case 'countdown':
+              setGameStatus('countdown');
+              gameStatusRef.current = 'countdown';
+              setCountdown(message.seconds);
+              break;
+
+            case 'state-update':
+              setGameState({
+                puck: message.puck,
+                paddle1: message.paddle1,
+                paddle2: message.paddle2,
+                score: message.score,
+              });
+              // Transition to playing when we receive first state update
+              if (
+                gameStatusRef.current === 'countdown' ||
+                gameStatusRef.current === 'waiting'
+              ) {
+                setGameStatus('playing');
+                gameStatusRef.current = 'playing';
+                setCountdown(null);
+              }
+              break;
+
+            case 'goal':
+              // Update score immediately from goal message
+              setGameState((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      score: message.newScore,
+                    }
+                  : null
               );
-              lastPuckSyncRef.current = now;
-            }
+              break;
+
+            case 'game-over':
+              setWinner(message.winner);
+              setGameStatus('ended');
+              gameStatusRef.current = 'ended';
+              setGameState((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      score: message.finalScore,
+                    }
+                  : null
+              );
+              break;
+
+            case 'error':
+              setConnectionError(message.message);
+              break;
+
+            case 'pong':
+              lastPongRef.current = Date.now();
+              break;
           }
+        } catch (err) {
+          console.error('Failed to parse WebSocket message:', err);
+        }
+      };
+
+      ws.onerror = () => {
+        if (!isMounted) return;
+        setConnectionError(
+          isConnected
+            ? 'Connection lost unexpectedly'
+            : 'Failed to establish connection'
+        );
+      };
+
+      ws.onclose = (event) => {
+        if (!isMounted) return;
+
+        setIsConnected(false);
+        wsRef.current = null;
+        stopHeartbeat();
+
+        // Don't reconnect for intentional closes or server rejections
+        if (gameStatusRef.current === 'ended' ||
+            event.code === 4000 || // Our timeout code
+            (event.code >= 4000 && event.code < 5000)) {
+          return;
         }
 
-        // Client: Update puck body with interpolated position
-        if (isMultiplayer && !isHost) {
-          const interpolated = puckInterpolation.getInterpolatedPosition();
-          if (interpolated && gameEngineRef.current) {
-            const puck = gameEngineRef.current.bodies.puck;
-            // Directly set position (Matter.js Body.setPosition)
-            const Matter = require('matter-js');
-            Matter.Body.setPosition(puck, interpolated);
-          }
-        }
+        // Exponential backoff reconnection with jitter (max 5 attempts)
+        if (reconnectAttemptRef.current < 5) {
+          const baseDelay = Math.min(
+            1000 * Math.pow(2, reconnectAttemptRef.current),
+            10000
+          );
+          const jitter = Math.random() * 0.3 * baseDelay; // 0-30% jitter
+          const delay = baseDelay + jitter;
+          reconnectAttemptRef.current++;
 
-        // Update opponent paddle position from network
-        if (isMultiplayer) {
-          const opponentPos = opponentPaddleInterpolation.getPosition();
-          if (opponentPos && gameEngineRef.current) {
-            // Determine which paddle is opponent
-            const opponentPlayer: Player = playerNumber === 1 ? 'player2' : 'player1';
-            gameEngineRef.current.movePaddle(opponentPlayer, opponentPos.x, opponentPos.y);
-          }
+          setIsConnecting(true);
+          reconnectTimeoutRef.current = setTimeout(() => {
+            connect();
+          }, delay);
+        } else {
+          setConnectionError('Failed to connect after multiple attempts');
+          setIsConnecting(false);
         }
-      }
-
-      frameRef.current = requestAnimationFrame(gameLoop);
+      };
     };
 
-    frameRef.current = requestAnimationFrame(gameLoop);
+    connect();
 
     return () => {
-      if (frameRef.current) {
-        cancelAnimationFrame(frameRef.current);
-      }
+      isMounted = false;
+      cleanup();
+      stopHeartbeat();
     };
-  }, [status, isMultiplayer, isHost, playerNumber, ws, puckInterpolation, opponentPaddleInterpolation]);
-
-  // Move paddle function - sends to network in multiplayer
-  const movePaddle = useCallback(
-    (player: Player, x: number, y: number) => {
-      if (gameEngineRef.current && status === 'playing') {
-        // In multiplayer, only move your own paddle locally
-        if (isMultiplayer) {
-          const myPlayer: Player = playerNumber === 1 ? 'player1' : 'player2';
-          if (player === myPlayer) {
-            gameEngineRef.current.movePaddle(player, x, y);
-            ws.sendPaddle(x, y);
-          }
-        } else {
-          // Single player - move any paddle
-          gameEngineRef.current.movePaddle(player, x, y);
-        }
-      }
-    },
-    [status, isMultiplayer, playerNumber, ws]
-  );
-
-  // Get current bodies for rendering
-  const getBodies = useCallback((): GameBodies | null => {
-    return gameEngineRef.current?.bodies ?? null;
-  }, []);
-
-  // Get which player the local user controls
-  const getMyPlayer = useCallback((): Player => {
-    if (isMultiplayer && playerNumber) {
-      return playerNumber === 1 ? 'player1' : 'player2';
-    }
-    return 'player1'; // Default for single player
-  }, [isMultiplayer, playerNumber]);
+  }, [gameId, playerId, cleanup, startHeartbeat, stopHeartbeat, isConnected]);
 
   return {
-    // Game actions
-    movePaddle,
-    getBodies,
-    getMyPlayer,
+    // Connection state
+    isConnected,
+    isConnecting,
+    connectionError,
 
-    // Multiplayer state from WebSocket
-    ws,
-
-    // Helpers
-    isMultiplayer,
-    isHost,
+    // Game state
+    gameState,
     playerNumber,
+    opponentJoined,
+    countdown,
+    gameStatus,
+    winner,
+
+    // Actions
+    sendPaddleMove,
+    disconnect,
   };
 }
+
+// Re-export types for consumers
+export type { ServerGameState, GameStatus, UseMultiplayerGameResult };

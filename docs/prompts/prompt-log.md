@@ -36,3 +36,25 @@
 - Identified issues: WebSocket sync broken (Render sleeping), no @linera/client installed, contracts not deployed
 - Created 7-phase implementation plan in `/docs/plans/LINERA_BLOCKCHAIN_INTEGRATION_PLAN.md`
 - Plan covers: contract deployment, real MetaMask signing, gas token consumption, stake locking, winner payouts
+
+## 2026-01-20
+
+### Prompt 5
+> Research the exact API of the @linera/client npm package to ensure our implementation is correct.
+
+**Action:** Researched @linera/client npm package API comprehensively:
+- Fetched official Linera documentation (setup.html, interactivity.html)
+- Reviewed Dynamic integration documentation
+- Analyzed existing codebase implementation (linera-adapter.ts, dynamic-signer.ts, linera-client.ts)
+- Compiled detailed API documentation covering: WASM initialization, Faucet API, Client API, GraphQL queries, Notifications, and Wallet serialization
+
+### Prompt 6
+> Create a Linera CLI service wrapper at `/Users/MAC/Desktop/dev/linera/air-hockey/server/src/services/linera.ts`.
+
+**Action:** Created comprehensive LineraService class at `/server/src/services/linera.ts`:
+- Process management for `linera service --port 8081` with auto-restart on crash
+- GraphQL query helper for communicating with the service
+- Wallet operations: `getBalance(chainId)`
+- Game operations: `createGame()`, `joinGame()`, `getOpenGames()`, `getGame()`, `submitResult()`, `cancelGame()`
+- Environment configuration: LINERA_SERVICE_PORT, LINERA_APPLICATION_ID, LINERA_CHAIN_ID
+- Health checks, graceful shutdown, and singleton export

@@ -11,12 +11,12 @@ export const USE_MOCK_CLIENT = process.env.NEXT_PUBLIC_USE_MOCK_LINERA === 'true
 
 // Linera Network Configuration
 export const LINERA_CONFIG = {
-  // Faucet URL for testnet wallet creation
-  faucetUrl: process.env.NEXT_PUBLIC_LINERA_FAUCET_URL || 'https://faucet.testnet-archimedes.linera.net',
+  // Faucet URL for testnet wallet creation (Conway testnet)
+  faucetUrl: process.env.NEXT_PUBLIC_LINERA_FAUCET_URL || 'https://faucet.testnet-conway.linera.net',
 
   // Node service URL (GraphQL endpoint)
-  // Use testnet RPC by default for production
-  nodeServiceUrl: process.env.NEXT_PUBLIC_LINERA_NODE_URL || 'https://rpc.testnet-archimedes.linera.net',
+  // Use Conway testnet RPC by default for production
+  nodeServiceUrl: process.env.NEXT_PUBLIC_LINERA_NODE_URL || 'https://rpc.testnet-conway.linera.net',
 
   // Deployed application ID
   applicationId: process.env.NEXT_PUBLIC_LINERA_APPLICATION_ID || '',

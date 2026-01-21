@@ -1,11 +1,11 @@
 'use client';
 
 /**
- * CyberButton - Primary, secondary, and ghost button variants
+ * CyberButton - Theme-aware button component
  */
 
 import React from 'react';
-import { cyberTheme } from '@/lib/cyber/theme';
+import { useThemedStyles } from '@/lib/cyber/useThemedStyles';
 
 interface CyberButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
@@ -34,6 +34,8 @@ export function CyberButton({
   disabled,
   ...props
 }: CyberButtonProps) {
+  const theme = useThemedStyles();
+
   const baseStyles = `
     relative
     inline-flex items-center justify-center gap-2
@@ -49,38 +51,38 @@ export function CyberButton({
     switch (variant) {
       case 'primary':
         return {
-          backgroundColor: cyberTheme.colors.primary,
-          color: cyberTheme.colors.text.primary,
-          border: `1px solid ${cyberTheme.colors.primary}`,
-          boxShadow: glow ? `0 0 20px ${cyberTheme.colors.primary}60` : 'none',
+          backgroundColor: theme.colors.primary,
+          color: theme.colors.text.primary,
+          border: `1px solid ${theme.colors.primary}`,
+          boxShadow: glow ? `0 0 20px ${theme.colors.primary}60` : 'none',
         };
       case 'secondary':
         return {
           backgroundColor: 'transparent',
-          color: cyberTheme.colors.primary,
-          border: `1px solid ${cyberTheme.colors.primary}`,
-          boxShadow: glow ? `0 0 15px ${cyberTheme.colors.primary}40` : 'none',
+          color: theme.colors.primary,
+          border: `1px solid ${theme.colors.primary}`,
+          boxShadow: glow ? `0 0 15px ${theme.colors.primary}40` : 'none',
         };
       case 'ghost':
         return {
           backgroundColor: 'transparent',
-          color: cyberTheme.colors.text.secondary,
+          color: theme.colors.text.secondary,
           border: '1px solid transparent',
           boxShadow: 'none',
         };
       case 'danger':
         return {
-          backgroundColor: cyberTheme.colors.error,
-          color: cyberTheme.colors.text.primary,
-          border: `1px solid ${cyberTheme.colors.error}`,
-          boxShadow: glow ? `0 0 20px ${cyberTheme.colors.error}60` : 'none',
+          backgroundColor: theme.colors.error,
+          color: theme.colors.text.primary,
+          border: `1px solid ${theme.colors.error}`,
+          boxShadow: glow ? `0 0 20px ${theme.colors.error}60` : 'none',
         };
       case 'success':
         return {
-          backgroundColor: cyberTheme.colors.success,
-          color: cyberTheme.colors.text.primary,
-          border: `1px solid ${cyberTheme.colors.success}`,
-          boxShadow: glow ? `0 0 20px ${cyberTheme.colors.success}60` : 'none',
+          backgroundColor: theme.colors.success,
+          color: theme.colors.text.primary,
+          border: `1px solid ${theme.colors.success}`,
+          boxShadow: glow ? `0 0 20px ${theme.colors.success}60` : 'none',
         };
     }
   };
@@ -91,10 +93,10 @@ export function CyberButton({
 
     if (entering) {
       if (variant === 'secondary') {
-        target.style.backgroundColor = `${cyberTheme.colors.primary}20`;
+        target.style.backgroundColor = `${theme.colors.primary}20`;
       } else if (variant === 'ghost') {
-        target.style.backgroundColor = `${cyberTheme.colors.primary}10`;
-        target.style.color = cyberTheme.colors.primary;
+        target.style.backgroundColor = `${theme.colors.primary}10`;
+        target.style.color = theme.colors.primary;
       } else if (variant === 'primary') {
         target.style.filter = 'brightness(1.1)';
       }
@@ -102,7 +104,7 @@ export function CyberButton({
       target.style.backgroundColor = getVariantStyles().backgroundColor;
       target.style.filter = 'none';
       if (variant === 'ghost') {
-        target.style.color = cyberTheme.colors.text.secondary;
+        target.style.color = theme.colors.text.secondary;
       }
     }
   };
@@ -112,7 +114,7 @@ export function CyberButton({
       className={`${baseStyles} ${className}`}
       style={{
         ...getVariantStyles(),
-        fontFamily: cyberTheme.fonts.heading,
+        fontFamily: theme.fonts.heading,
       }}
       disabled={disabled || loading}
       onMouseEnter={(e) => handleHover(e, true)}

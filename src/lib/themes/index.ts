@@ -1,9 +1,16 @@
-export type ThemeId = 'neon' | 'minimal' | 'retro' | 'ice' | 'cyber';
+/**
+ * Air Hockey Theme System
+ * 4 World-Class Themes - NO PURPLE
+ * Each theme is a complete visual identity with unique animations
+ */
+
+export type ThemeId = 'arcade' | 'retro' | 'premium' | 'electric';
 
 export interface ThemeColors {
   // Background
   background: string;
   backgroundGradient?: string;
+  backgroundSecondary?: string;
 
   // Table
   table: string;
@@ -40,268 +47,350 @@ export interface ThemeColors {
   score2: string;
 }
 
+export interface ThemeAnimations {
+  // Animation class names for each event
+  scoreChange: string;
+  victory: string;
+  defeat: string;
+  buttonHover: string;
+  buttonClick: string;
+  cardEnter: string;
+  screenFlash: string;
+  idle: string;
+}
+
+export interface ThemeEffects {
+  glowIntensity: number;
+  trailEffect: boolean;
+  particles: boolean;
+  scanlines: boolean;
+  blur: number;
+  // Visual effect settings
+  screenCurvature: boolean;
+  phosphorBloom: boolean;
+  starfield: boolean;
+  meshGradient: boolean;
+  metallicShimmer: boolean;
+  ambientLight: boolean;
+}
+
 export interface Theme {
   id: ThemeId;
   name: string;
   description: string;
+  tagline: string;
   colors: ThemeColors;
-  effects: {
-    glowIntensity: number;
-    trailEffect: boolean;
-    particles: boolean;
-    scanlines: boolean;
-    blur: number;
-  };
+  effects: ThemeEffects;
   fonts: {
     heading: string;
     body: string;
     score: string;
   };
+  animations: ThemeAnimations;
+  // CSS class prefix for theme-specific styles
+  cssPrefix: string;
+  // Border radius style
+  borderRadius: string;
 }
 
 // ============================================
-// THEME 1: NEON ARCADE
-// Vibrant synthwave aesthetic with intense glows
+// THEME 1: ARCADE CLASSIC
+// Bold neon on black - classic arcade cabinet vibes
+// INSERT COIN • HIGH SCORE • GAME OVER
 // ============================================
-export const neonTheme: Theme = {
-  id: 'neon',
-  name: 'Neon Arcade',
-  description: 'Vibrant synthwave vibes with intense glow effects',
+export const arcadeTheme: Theme = {
+  id: 'arcade',
+  name: 'Arcade Classic',
+  description: 'Bold neon colors on black. Classic arcade cabinet vibes.',
+  tagline: 'INSERT COIN TO PLAY',
   colors: {
-    background: '#0a0015',
-    backgroundGradient: 'radial-gradient(ellipse at center, #1a0030 0%, #0a0015 100%)',
-    table: '#12001f',
-    tableBorder: '#ff00ff',
-    centerLine: '#ff00ff40',
-    centerCircle: '#00ffff40',
-    goalPlayer1: '#00ff8840',
-    goalPlayer2: '#ff008840',
+    background: '#000000',
+    backgroundGradient: 'radial-gradient(ellipse at center, #0a0a0a 0%, #000000 100%)',
+    backgroundSecondary: '#0a0a0a',
+    table: '#050505',
+    tableBorder: '#FF0040',
+    centerLine: '#FFE60050',
+    centerCircle: '#FFE60040',
+    goalPlayer1: '#00FF8840',
+    goalPlayer2: '#FF004040',
     puck: '#ffffff',
-    puckGlow: '#00ffff',
-    paddle1: '#00ff88',
-    paddle1Glow: '#00ff88',
+    puckGlow: '#FFE600',
+    paddle1: '#00FF88',
+    paddle1Glow: '#00FF88',
     paddle1Inner: '#003322',
-    paddle2: '#ff0088',
-    paddle2Glow: '#ff0088',
-    paddle2Inner: '#330022',
-    primary: '#ff00ff',
-    secondary: '#00ffff',
-    accent: '#ffff00',
+    paddle2: '#FF0040',
+    paddle2Glow: '#FF0040',
+    paddle2Inner: '#330011',
+    primary: '#FF0040',
+    secondary: '#00FF88',
+    accent: '#FFE600',
     text: '#ffffff',
-    textMuted: '#888899',
-    score1: '#00ff88',
-    score2: '#ff0088',
-  },
-  effects: {
-    glowIntensity: 30,
-    trailEffect: true,
-    particles: true,
-    scanlines: false,
-    blur: 0,
-  },
-  fonts: {
-    heading: "'Orbitron', sans-serif",
-    body: "'Rajdhani', sans-serif",
-    score: "'Orbitron', monospace",
-  },
-};
-
-// ============================================
-// THEME 2: MINIMALIST PRO
-// Clean, elegant, tournament-ready design
-// ============================================
-export const minimalTheme: Theme = {
-  id: 'minimal',
-  name: 'Minimalist Pro',
-  description: 'Clean elegance for focused gameplay',
-  colors: {
-    background: '#fafafa',
-    backgroundGradient: 'linear-gradient(180deg, #ffffff 0%, #f0f0f0 100%)',
-    table: '#ffffff',
-    tableBorder: '#e0e0e0',
-    centerLine: '#00000015',
-    centerCircle: '#00000010',
-    goalPlayer1: '#22c55e15',
-    goalPlayer2: '#ef444415',
-    puck: '#1a1a1a',
-    puckGlow: '#00000020',
-    puckShadow: '#00000030',
-    paddle1: '#1a1a1a',
-    paddle1Glow: '#00000010',
-    paddle1Inner: '#404040',
-    paddle2: '#666666',
-    paddle2Glow: '#00000010',
-    paddle2Inner: '#888888',
-    primary: '#1a1a1a',
-    secondary: '#666666',
-    accent: '#0066ff',
-    text: '#1a1a1a',
     textMuted: '#888888',
-    score1: '#1a1a1a',
-    score2: '#666666',
+    score1: '#00FF88',
+    score2: '#FF0040',
   },
   effects: {
-    glowIntensity: 0,
-    trailEffect: false,
+    glowIntensity: 25,
+    trailEffect: true,
     particles: false,
     scanlines: false,
     blur: 0,
+    screenCurvature: false,
+    phosphorBloom: false,
+    starfield: true,
+    meshGradient: false,
+    metallicShimmer: false,
+    ambientLight: false,
   },
   fonts: {
-    heading: "'Inter', sans-serif",
+    heading: "'Press Start 2P', monospace",
     body: "'Inter', sans-serif",
-    score: "'SF Mono', 'Roboto Mono', monospace",
+    score: "'Press Start 2P', monospace",
   },
+  animations: {
+    scoreChange: 'arcade-score-pop',
+    victory: 'arcade-victory',
+    defeat: 'arcade-defeat',
+    buttonHover: 'arcade-btn-hover',
+    buttonClick: 'arcade-btn-click',
+    cardEnter: 'arcade-card-enter',
+    screenFlash: 'arcade-flash',
+    idle: 'arcade-idle-pulse',
+  },
+  cssPrefix: 'arcade',
+  borderRadius: '0',
 };
 
 // ============================================
-// THEME 3: RETRO PIXEL
-// Classic 8-bit arcade nostalgia
+// THEME 2: RETRO GAMING
+// CRT phosphor glow - 80s terminal aesthetics
+// SYSTEM LOADING... READY.
 // ============================================
 export const retroTheme: Theme = {
   id: 'retro',
-  name: 'Retro Pixel',
-  description: '8-bit arcade nostalgia with CRT effects',
+  name: 'Retro Gaming',
+  description: 'Warm CRT phosphor glow. 80s computer terminal aesthetics.',
+  tagline: 'SYSTEM READY_',
   colors: {
-    background: '#000000',
-    backgroundGradient: 'linear-gradient(180deg, #001100 0%, #000000 100%)',
-    table: '#001a00',
-    tableBorder: '#00ff00',
-    centerLine: '#00ff0040',
-    centerCircle: '#00ff0030',
-    goalPlayer1: '#00ff0030',
-    goalPlayer2: '#ff000030',
-    puck: '#ffff00',
-    puckGlow: '#ffff00',
-    paddle1: '#00ff00',
-    paddle1Glow: '#00ff00',
-    paddle1Inner: '#004400',
-    paddle2: '#ff0000',
-    paddle2Glow: '#ff0000',
-    paddle2Inner: '#440000',
-    primary: '#00ff00',
-    secondary: '#ffff00',
-    accent: '#ff0000',
-    text: '#00ff00',
-    textMuted: '#008800',
-    score1: '#00ff00',
-    score2: '#ff0000',
+    background: '#0D0D0D',
+    backgroundGradient: 'linear-gradient(180deg, #121210 0%, #0D0D0D 100%)',
+    backgroundSecondary: '#0A0A08',
+    table: '#0A0A08',
+    tableBorder: '#33FF00',
+    centerLine: '#33FF0040',
+    centerCircle: '#33FF0030',
+    goalPlayer1: '#33FF0030',
+    goalPlayer2: '#FFAA0030',
+    puck: '#FFFFFF',
+    puckGlow: '#33FF00',
+    paddle1: '#33FF00',
+    paddle1Glow: '#33FF00',
+    paddle1Inner: '#0A2200',
+    paddle2: '#FFAA00',
+    paddle2Glow: '#FFAA00',
+    paddle2Inner: '#221800',
+    primary: '#33FF00',
+    secondary: '#FFAA00',
+    accent: '#00FFFF',
+    text: '#33FF00',
+    textMuted: '#116600',
+    score1: '#33FF00',
+    score2: '#FFAA00',
   },
   effects: {
     glowIntensity: 15,
     trailEffect: false,
     particles: false,
     scanlines: true,
-    blur: 0,
+    blur: 0.5,
+    screenCurvature: true,
+    phosphorBloom: true,
+    starfield: false,
+    meshGradient: false,
+    metallicShimmer: false,
+    ambientLight: false,
   },
   fonts: {
-    heading: "'Press Start 2P', cursive",
+    heading: "'VT323', monospace",
     body: "'VT323', monospace",
-    score: "'Press Start 2P', monospace",
+    score: "'VT323', monospace",
   },
+  animations: {
+    scoreChange: 'retro-score-flicker',
+    victory: 'retro-victory',
+    defeat: 'retro-defeat',
+    buttonHover: 'retro-btn-hover',
+    buttonClick: 'retro-btn-click',
+    cardEnter: 'retro-card-enter',
+    screenFlash: 'retro-flash',
+    idle: 'retro-cursor-blink',
+  },
+  cssPrefix: 'retro',
+  borderRadius: '0',
 };
 
 // ============================================
-// THEME 4: ICE RINK
-// Realistic ice hockey atmosphere
+// THEME 3: PREMIUM GAMING
+// Sophisticated dark with luxurious gold accents
+// EXCELLENCE • PRESTIGE • VICTORY
 // ============================================
-export const iceTheme: Theme = {
-  id: 'ice',
-  name: 'Ice Rink',
-  description: 'Realistic ice hockey atmosphere',
+export const premiumTheme: Theme = {
+  id: 'premium',
+  name: 'Premium Gaming',
+  description: 'Sophisticated dark theme with luxurious gold accents.',
+  tagline: 'EXCELLENCE AWAITS',
   colors: {
-    background: '#0c1929',
-    backgroundGradient: 'linear-gradient(180deg, #1a3a5c 0%, #0c1929 100%)',
-    table: '#d4e5f7',
-    tableBorder: '#2563eb',
-    centerLine: '#ef444480',
-    centerCircle: '#ef444460',
-    goalPlayer1: '#dc262640',
-    goalPlayer2: '#dc262640',
-    puck: '#1a1a1a',
-    puckGlow: '#00000040',
-    puckShadow: '#00000060',
-    paddle1: '#1e40af',
-    paddle1Glow: '#3b82f640',
-    paddle1Inner: '#1e3a8a',
-    paddle2: '#dc2626',
-    paddle2Glow: '#ef444440',
-    paddle2Inner: '#991b1b',
-    primary: '#2563eb',
-    secondary: '#64748b',
-    accent: '#dc2626',
-    text: '#f8fafc',
-    textMuted: '#94a3b8',
-    score1: '#3b82f6',
-    score2: '#ef4444',
+    background: '#0C0C0E',
+    backgroundGradient: 'linear-gradient(180deg, #121214 0%, #0C0C0E 100%)',
+    backgroundSecondary: '#0F0F11',
+    table: '#0F0F11',
+    tableBorder: '#D4AF37',
+    centerLine: '#D4AF3730',
+    centerCircle: '#D4AF3720',
+    goalPlayer1: '#D4AF3725',
+    goalPlayer2: '#C0C0C025',
+    puck: '#FFFFFF',
+    puckGlow: '#D4AF37',
+    puckShadow: '#00000080',
+    paddle1: '#D4AF37',
+    paddle1Glow: '#D4AF37',
+    paddle1Inner: '#2A2206',
+    paddle2: '#C0C0C0',
+    paddle2Glow: '#C0C0C0',
+    paddle2Inner: '#1A1A1A',
+    primary: '#D4AF37',
+    secondary: '#B87333',
+    accent: '#E8D5B7',
+    text: '#F5F5F5',
+    textMuted: '#71717A',
+    score1: '#D4AF37',
+    score2: '#C0C0C0',
   },
   effects: {
-    glowIntensity: 8,
+    glowIntensity: 12,
     trailEffect: true,
     particles: false,
     scanlines: false,
-    blur: 1,
+    blur: 0,
+    screenCurvature: false,
+    phosphorBloom: false,
+    starfield: false,
+    meshGradient: false,
+    metallicShimmer: true,
+    ambientLight: true,
   },
   fonts: {
     heading: "'Bebas Neue', sans-serif",
-    body: "'Open Sans', sans-serif",
+    body: "'Inter', sans-serif",
     score: "'Bebas Neue', sans-serif",
   },
+  animations: {
+    scoreChange: 'premium-score-elegant',
+    victory: 'premium-victory',
+    defeat: 'premium-defeat',
+    buttonHover: 'premium-btn-hover',
+    buttonClick: 'premium-btn-click',
+    cardEnter: 'premium-card-enter',
+    screenFlash: 'premium-flash',
+    idle: 'premium-shimmer',
+  },
+  cssPrefix: 'premium',
+  borderRadius: '16px',
 };
 
 // ============================================
-// THEME 5: CYBER SPORTS
-// Esports-ready with dynamic overlays
+// THEME 4: ELECTRIC VIBRANT
+// Fresh teal and coral - modern, energetic
+// POWER UP • LEVEL UP • GAME ON
 // ============================================
-export const cyberTheme: Theme = {
-  id: 'cyber',
-  name: 'Cyber Sports',
-  description: 'Esports-ready with dynamic HUD',
+export const electricTheme: Theme = {
+  id: 'electric',
+  name: 'Electric Vibrant',
+  description: 'Fresh teal and coral. Modern, energetic, bold.',
+  tagline: 'POWER UP',
   colors: {
-    background: '#030712',
-    backgroundGradient: 'linear-gradient(135deg, #030712 0%, #111827 50%, #030712 100%)',
-    table: '#111827',
-    tableBorder: '#6366f1',
-    centerLine: '#8b5cf640',
-    centerCircle: '#6366f140',
-    goalPlayer1: '#10b98130',
-    goalPlayer2: '#f4365430',
-    puck: '#f8fafc',
-    puckGlow: '#8b5cf6',
-    paddle1: '#10b981',
-    paddle1Glow: '#10b981',
-    paddle1Inner: '#064e3b',
-    paddle2: '#f43654',
-    paddle2Glow: '#f43654',
-    paddle2Inner: '#7f1d2d',
-    primary: '#6366f1',
-    secondary: '#8b5cf6',
-    accent: '#f43654',
-    text: '#f8fafc',
-    textMuted: '#6b7280',
-    score1: '#10b981',
-    score2: '#f43654',
+    background: '#0A0F14',
+    backgroundGradient: 'linear-gradient(135deg, #0A0F14 0%, #0F1419 50%, #0A0F14 100%)',
+    backgroundSecondary: '#0D1218',
+    table: '#0D1218',
+    tableBorder: '#14B8A6',
+    centerLine: '#14B8A640',
+    centerCircle: '#14B8A630',
+    goalPlayer1: '#14B8A630',
+    goalPlayer2: '#FF6B6B30',
+    puck: '#FFFFFF',
+    puckGlow: '#3B82F6',
+    paddle1: '#14B8A6',
+    paddle1Glow: '#14B8A6',
+    paddle1Inner: '#042F2B',
+    paddle2: '#FF6B6B',
+    paddle2Glow: '#FF6B6B',
+    paddle2Inner: '#331515',
+    primary: '#14B8A6',
+    secondary: '#FF6B6B',
+    accent: '#3B82F6',
+    text: '#F8FAFC',
+    textMuted: '#64748B',
+    score1: '#14B8A6',
+    score2: '#FF6B6B',
   },
   effects: {
-    glowIntensity: 20,
+    glowIntensity: 18,
     trailEffect: true,
-    particles: true,
+    particles: false,
     scanlines: false,
     blur: 0,
+    screenCurvature: false,
+    phosphorBloom: false,
+    starfield: false,
+    meshGradient: true,
+    metallicShimmer: false,
+    ambientLight: false,
   },
   fonts: {
-    heading: "'Exo 2', sans-serif",
-    body: "'Exo 2', sans-serif",
-    score: "'Orbitron', monospace",
+    heading: "'Space Grotesk', sans-serif",
+    body: "'Inter', sans-serif",
+    score: "'Space Grotesk', sans-serif",
   },
+  animations: {
+    scoreChange: 'electric-score-spring',
+    victory: 'electric-victory',
+    defeat: 'electric-defeat',
+    buttonHover: 'electric-btn-hover',
+    buttonClick: 'electric-btn-click',
+    cardEnter: 'electric-card-enter',
+    screenFlash: 'electric-flash',
+    idle: 'electric-gradient-flow',
+  },
+  cssPrefix: 'electric',
+  borderRadius: '20px',
 };
 
 export const themes: Record<ThemeId, Theme> = {
-  neon: neonTheme,
-  minimal: minimalTheme,
+  arcade: arcadeTheme,
   retro: retroTheme,
-  ice: iceTheme,
-  cyber: cyberTheme,
+  premium: premiumTheme,
+  electric: electricTheme,
 };
 
 export const themeList = Object.values(themes);
+
+export const defaultTheme: ThemeId = 'arcade';
+
+// Helper function to get CSS variables from theme
+export function getThemeCSSVariables(theme: Theme): Record<string, string> {
+  return {
+    '--theme-bg': theme.colors.background,
+    '--theme-bg-secondary': theme.colors.backgroundSecondary || theme.colors.background,
+    '--theme-primary': theme.colors.primary,
+    '--theme-secondary': theme.colors.secondary,
+    '--theme-accent': theme.colors.accent,
+    '--theme-text': theme.colors.text,
+    '--theme-text-muted': theme.colors.textMuted,
+    '--theme-glow': `${theme.effects.glowIntensity}px`,
+    '--theme-radius': theme.borderRadius,
+    '--theme-font-heading': theme.fonts.heading,
+    '--theme-font-body': theme.fonts.body,
+    '--theme-font-score': theme.fonts.score,
+  };
+}

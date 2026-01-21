@@ -1,0 +1,118 @@
+import { WebSocketServer, WebSocket } from 'ws';
+import { Server as HttpServer } from 'http';
+import { roomManager } from './room-manager';
+import { ClientMessage, isClientMessage, isJoinRoomMessage, isPaddleMoveMessage, isPlayerReadyMessage, isPingMessage } from './message-types';
+import { GameServer } from '../services/game-server';
+
+export function setupWebSocketServer(httpServer: HttpServer, gameServer: GameServer): WebSocketServer {
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  const connectionTimeouts: Map<WebSocket, NodeJS.Timeout> = new Map();
+
+  const clearConnectionTimeout = (ws: WebSocket) => {
+    const timeout = connectionTimeouts.get(ws);
+    if (timeout) {
+      clearTimeout(timeout);
+      connectionTimeouts.delete(ws);
+    }
+  };
+
+  wss.on('connection', (ws: WebSocket) => {
+    console.log('[WebSocket] New connection');
+
+    // Set a timeout - client must join a room within 30 seconds
+    const timeout = setTimeout(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        console.log('[WebSocket] Connection timeout - no room joined');
+        try {
+          ws.send(JSON.stringify({
+            type: 'error',
+            code: 'CONNECTION_TIMEOUT',
+            message: 'Must join a room within 30 seconds'
+          }));
+        } catch (error) {
+          console.error('[WebSocket] Failed to send timeout error:', error);
+        }
+        ws.close(4000, 'Connection timeout');
+      }
+      connectionTimeouts.delete(ws);
+    }, 30000);
+    connectionTimeouts.set(ws, timeout);
+
+    ws.on('message', (data: Buffer) => {
+      try {
+        const parsed = JSON.parse(data.toString());
+
+        // Validate it's a known client message before routing
+        if (!isClientMessage(parsed)) {
+          console.warn('[WebSocket] Unknown message type:', parsed?.type);
+          try {
+            ws.send(JSON.stringify({
+              type: 'error',
+              code: 'INVALID_MESSAGE',
+              message: `Unknown message type: ${parsed?.type || 'undefined'}`
+            }));
+          } catch (error) {
+            console.error('[WebSocket] Failed to send invalid message error:', error);
+          }
+          return;
+        }
+
+        // Clear timeout on join-room (they're engaging with the server)
+        if (isJoinRoomMessage(parsed)) {
+          clearConnectionTimeout(ws);
+        }
+
+        handleMessage(ws, parsed, gameServer);
+      } catch (error) {
+        console.error('[WebSocket] Invalid message:', error);
+        try {
+          ws.send(JSON.stringify({
+            type: 'error',
+            code: 'INVALID_MESSAGE',
+            message: 'Invalid message format'
+          }));
+        } catch (sendError) {
+          console.error('[WebSocket] Failed to send parse error:', sendError);
+        }
+      }
+    });
+
+    ws.on('close', () => {
+      clearConnectionTimeout(ws);
+      handleDisconnect(ws, gameServer);
+    });
+
+    ws.on('error', (error) => {
+      console.error('[WebSocket] Error:', error);
+      clearConnectionTimeout(ws);
+    });
+  });
+
+  return wss;
+}
+
+function handleMessage(ws: WebSocket, message: ClientMessage, gameServer: GameServer): void {
+  if (isJoinRoomMessage(message)) {
+    gameServer.handleJoinRoom(ws, message.gameId, message.playerId);
+  } else if (isPaddleMoveMessage(message)) {
+    gameServer.handlePaddleMove(ws, message.x, message.y);
+  } else if (isPlayerReadyMessage(message)) {
+    gameServer.handlePlayerReady(ws, message.gameId);
+  } else if (isPingMessage(message)) {
+    // Respond to heartbeat ping with pong
+    try {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'pong' }));
+      }
+    } catch (error) {
+      console.error('[WebSocket] Failed to send pong:', error);
+    }
+  }
+}
+
+function handleDisconnect(ws: WebSocket, gameServer: GameServer): void {
+  const roomInfo = roomManager.getRoomByWebSocket(ws);
+  if (roomInfo) {
+    gameServer.handleDisconnect(roomInfo.gameId, roomInfo.playerId);
+  }
+}
