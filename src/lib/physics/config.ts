@@ -22,7 +22,7 @@ export const PHYSICS_CONFIG: PhysicsConfig = {
   },
 
   paddle: {
-    radius: 25,
+    radius: 30,
     mass: 1,
     restitution: 0.8,
     friction: 0.1,

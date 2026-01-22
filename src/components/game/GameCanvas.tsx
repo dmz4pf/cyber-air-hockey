@@ -27,12 +27,34 @@ export interface GameCanvasRef {
 const TRAIL_LENGTH = 12; // Number of trail points
 const TRAIL_FADE_RATE = 0.85; // How quickly opacity fades (0-1)
 
+// Paddle trail configuration (shorter than puck)
+const PADDLE_TRAIL_LENGTH = 6;
+const PADDLE_TRAIL_FADE_RATE = 0.75;
+
+// Paddle glow animation
+const GLOW_PULSE_SPEED = 0.003; // Speed of pulsing
+const GLOW_MIN = 15;
+const GLOW_MAX = 30;
+
+// Contact flash duration (ms)
+const CONTACT_FLASH_DURATION = 150;
+
 export const GameCanvas = forwardRef<GameCanvasRef, GameCanvasProps>(
   function GameCanvas({ getBodies }, ref) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const animationRef = useRef<number>(0);
     // Store puck position history for trail effect
     const puckTrailRef = useRef<{ x: number; y: number }[]>([]);
+    // Store paddle position history for trail effects
+    const paddle1TrailRef = useRef<{ x: number; y: number }[]>([]);
+    const paddle2TrailRef = useRef<{ x: number; y: number }[]>([]);
+    // Track time for pulsing animation
+    const timeRef = useRef<number>(0);
+    // Track contact flash state
+    const paddle1ContactRef = useRef<number>(0); // timestamp of last contact
+    const paddle2ContactRef = useRef<number>(0);
+    // Track previous puck position to detect new collisions
+    const lastPuckPosRef = useRef<{ x: number; y: number } | null>(null);
 
     useImperativeHandle(ref, () => ({
       canvas: canvasRef.current,
@@ -94,6 +116,43 @@ export const GameCanvas = forwardRef<GameCanvasRef, GameCanvasProps>(
       }
 
       const { puck, paddle1, paddle2 } = bodies;
+      const now = performance.now();
+      timeRef.current = now;
+
+      // Calculate pulsing glow intensity
+      const pulsePhase = Math.sin(now * GLOW_PULSE_SPEED);
+      const baseGlow = GLOW_MIN + (GLOW_MAX - GLOW_MIN) * (0.5 + 0.5 * pulsePhase);
+
+      // Detect paddle-puck collisions for flash effect
+      const collisionDistance = paddle.radius + puckConfig.radius;
+      const dist1 = Math.hypot(
+        puck.position.x - paddle1.position.x,
+        puck.position.y - paddle1.position.y
+      );
+      const dist2 = Math.hypot(
+        puck.position.x - paddle2.position.x,
+        puck.position.y - paddle2.position.y
+      );
+
+      // Check if this is a new collision (not continuous contact)
+      const lastPuck = lastPuckPosRef.current;
+      if (lastPuck) {
+        const lastDist1 = Math.hypot(lastPuck.x - paddle1.position.x, lastPuck.y - paddle1.position.y);
+        const lastDist2 = Math.hypot(lastPuck.x - paddle2.position.x, lastPuck.y - paddle2.position.y);
+
+        // Trigger flash only on new contact
+        if (dist1 <= collisionDistance * 1.1 && lastDist1 > collisionDistance * 1.1) {
+          paddle1ContactRef.current = now;
+        }
+        if (dist2 <= collisionDistance * 1.1 && lastDist2 > collisionDistance * 1.1) {
+          paddle2ContactRef.current = now;
+        }
+      }
+      lastPuckPosRef.current = { x: puck.position.x, y: puck.position.y };
+
+      // Calculate flash intensity (fades over CONTACT_FLASH_DURATION)
+      const flash1 = Math.max(0, 1 - (now - paddle1ContactRef.current) / CONTACT_FLASH_DURATION);
+      const flash2 = Math.max(0, 1 - (now - paddle2ContactRef.current) / CONTACT_FLASH_DURATION);
 
       // Update puck trail history
       const trail = puckTrailRef.current;
@@ -101,6 +160,47 @@ export const GameCanvas = forwardRef<GameCanvasRef, GameCanvasProps>(
       if (trail.length > TRAIL_LENGTH) {
         trail.pop();
       }
+
+      // Update paddle trails
+      const paddle1Trail = paddle1TrailRef.current;
+      paddle1Trail.unshift({ x: paddle1.position.x, y: paddle1.position.y });
+      if (paddle1Trail.length > PADDLE_TRAIL_LENGTH) {
+        paddle1Trail.pop();
+      }
+
+      const paddle2Trail = paddle2TrailRef.current;
+      paddle2Trail.unshift({ x: paddle2.position.x, y: paddle2.position.y });
+      if (paddle2Trail.length > PADDLE_TRAIL_LENGTH) {
+        paddle2Trail.pop();
+      }
+
+      // Draw paddle 1 trail
+      ctx.save();
+      for (let i = paddle1Trail.length - 1; i >= 1; i--) {
+        const point = paddle1Trail[i];
+        const opacity = Math.pow(PADDLE_TRAIL_FADE_RATE, i) * 0.4;
+        const size = paddle.radius * (1 - i / paddle1Trail.length * 0.3);
+
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(0, 204, 0, ${opacity})`;
+        ctx.fill();
+      }
+      ctx.restore();
+
+      // Draw paddle 2 trail
+      ctx.save();
+      for (let i = paddle2Trail.length - 1; i >= 1; i--) {
+        const point = paddle2Trail[i];
+        const opacity = Math.pow(PADDLE_TRAIL_FADE_RATE, i) * 0.4;
+        const size = paddle.radius * (1 - i / paddle2Trail.length * 0.3);
+
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(204, 0, 0, ${opacity})`;
+        ctx.fill();
+      }
+      ctx.restore();
 
       // Draw puck trail (before the puck itself)
       ctx.save();
@@ -126,31 +226,37 @@ export const GameCanvas = forwardRef<GameCanvasRef, GameCanvasProps>(
       ctx.fill();
       ctx.restore();
 
-      // Draw paddle 1 (player - bottom) with glow
+      // Draw paddle 1 (player - bottom) with pulsing glow and contact flash
       ctx.save();
-      ctx.shadowColor = '#00ff00';
-      ctx.shadowBlur = 20;
-      ctx.fillStyle = '#00cc00';
+      const glow1 = baseGlow + flash1 * 25; // Extra glow on contact
+      const green1 = Math.min(255, 204 + flash1 * 51); // Brighten on contact (204 -> 255)
+      ctx.shadowColor = `rgb(0, ${green1}, 0)`;
+      ctx.shadowBlur = glow1;
+      ctx.fillStyle = `rgb(0, ${green1}, 0)`;
       ctx.beginPath();
       ctx.arc(paddle1.position.x, paddle1.position.y, paddle.radius, 0, Math.PI * 2);
       ctx.fill();
       // Inner circle
-      ctx.fillStyle = '#004400';
+      const innerGreen1 = Math.min(100, 68 + flash1 * 32);
+      ctx.fillStyle = `rgb(0, ${innerGreen1}, 0)`;
       ctx.beginPath();
       ctx.arc(paddle1.position.x, paddle1.position.y, paddle.radius * 0.4, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
 
-      // Draw paddle 2 (AI/opponent - top) with glow
+      // Draw paddle 2 (AI/opponent - top) with pulsing glow and contact flash
       ctx.save();
-      ctx.shadowColor = '#ff0000';
-      ctx.shadowBlur = 20;
-      ctx.fillStyle = '#cc0000';
+      const glow2 = baseGlow + flash2 * 25;
+      const red2 = Math.min(255, 204 + flash2 * 51); // Brighten on contact
+      ctx.shadowColor = `rgb(${red2}, 0, 0)`;
+      ctx.shadowBlur = glow2;
+      ctx.fillStyle = `rgb(${red2}, 0, 0)`;
       ctx.beginPath();
       ctx.arc(paddle2.position.x, paddle2.position.y, paddle.radius, 0, Math.PI * 2);
       ctx.fill();
       // Inner circle
-      ctx.fillStyle = '#440000';
+      const innerRed2 = Math.min(100, 68 + flash2 * 32);
+      ctx.fillStyle = `rgb(${innerRed2}, 0, 0)`;
       ctx.beginPath();
       ctx.arc(paddle2.position.x, paddle2.position.y, paddle.radius * 0.4, 0, Math.PI * 2);
       ctx.fill();
