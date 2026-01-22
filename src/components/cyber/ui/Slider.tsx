@@ -138,7 +138,7 @@ export function Slider({
           box-shadow: var(--thumb-glow);
         }
         input[type='range']:focus::-webkit-slider-thumb {
-          box-shadow: var(--thumb-glow), 0 0 0 4px rgba(14, 165, 233, 0.2);
+          box-shadow: var(--thumb-glow), 0 0 0 4px rgba(29, 78, 216, 0.2);
         }
       `}</style>
     </div>

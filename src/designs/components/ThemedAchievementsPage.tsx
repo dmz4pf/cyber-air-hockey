@@ -68,7 +68,7 @@ export function ThemedAchievementsPage() {
     switch (rarity) {
       case 'common': return styles.colors.text.secondary;
       case 'rare': return styles.colors.info || '#3b82f6';
-      case 'epic': return styles.colors.secondary || '#0EA5E9';
+      case 'epic': return styles.colors.secondary || '#1D4ED8';
       case 'legendary': return styles.colors.warning;
       default: return styles.colors.text.primary;
     }

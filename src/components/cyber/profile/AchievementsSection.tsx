@@ -27,7 +27,7 @@ const rarityColors: Record<AchievementRarity, string> = {
   common: '#94a3b8',
   uncommon: '#22c55e',
   rare: '#3b82f6',
-  epic: '#0EA5E9',
+  epic: '#1D4ED8',
   legendary: '#fbbf24',
 };
 

@@ -95,35 +95,35 @@ export interface Theme {
 
 // ============================================
 // THEME 0: CYBER ESPORTS
-// Sky blue neon on deep navy - esports competitive vibes
+// Deep blue neon on deep navy - esports competitive vibes
 // COMPETE • DOMINATE • WIN
 // ============================================
 export const cyberTheme: Theme = {
   id: 'cyber',
   name: 'Cyber Esports',
-  description: 'Sky blue neon on deep navy. Competitive esports aesthetics.',
+  description: 'Deep blue neon on deep navy. Competitive esports aesthetics.',
   tagline: 'DOMINATE THE ARENA',
   colors: {
     background: '#050510',
     backgroundGradient: 'radial-gradient(ellipse at center, #0a0a20 0%, #050510 100%)',
     backgroundSecondary: '#0a0a20',
     table: '#080818',
-    tableBorder: '#0EA5E9',
-    centerLine: '#0EA5E950',
-    centerCircle: '#0EA5E940',
+    tableBorder: '#1D4ED8',
+    centerLine: '#1D4ED850',
+    centerCircle: '#1D4ED840',
     goalPlayer1: '#22c55e40',
     goalPlayer2: '#ef444440',
     puck: '#ffffff',
-    puckGlow: '#0EA5E9',
+    puckGlow: '#1D4ED8',
     paddle1: '#22c55e',
     paddle1Glow: '#22c55e',
     paddle1Inner: '#052e16',
     paddle2: '#ef4444',
     paddle2Glow: '#ef4444',
     paddle2Inner: '#450a0a',
-    primary: '#0EA5E9',
-    secondary: '#0284C7',
-    accent: '#38BDF8',
+    primary: '#1D4ED8',
+    secondary: '#1E40AF',
+    accent: '#3B82F6',
     text: '#f8fafc',
     textMuted: '#64748b',
     score1: '#22c55e',

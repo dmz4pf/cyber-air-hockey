@@ -56,7 +56,7 @@ export const RARITY_COLORS: Record<AchievementRarity, string> = {
   common: '#9ca3af', // gray
   uncommon: '#22c55e', // green
   rare: '#3b82f6', // blue
-  epic: '#0EA5E9', // sky blue
+  epic: '#1D4ED8', // deep blue
   legendary: '#f59e0b', // amber/gold
 };
 
