@@ -1,10 +1,11 @@
 'use client';
 
 /**
- * TopNavBar - Theme-aware navigation bar
+ * TopNavBar - Theme-aware navigation bar with wallet connection
  */
 
 import React, { useState } from 'react';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useThemedStyles } from '@/lib/cyber/useThemedStyles';
 import { usePlayerStore } from '@/stores/playerStore';
 import { Logo } from './Logo';
@@ -37,6 +38,80 @@ export function TopNavBar({ className = '' }: TopNavBarProps) {
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-6">
             <NavLinks />
+
+            {/* Wallet Connection - Shows alias instead of address */}
+            <ConnectButton.Custom>
+              {({
+                account,
+                chain,
+                openAccountModal,
+                openConnectModal,
+                authenticationStatus,
+                mounted,
+              }) => {
+                const ready = mounted && authenticationStatus !== 'loading';
+                const connected =
+                  ready &&
+                  account &&
+                  chain &&
+                  (!authenticationStatus || authenticationStatus === 'authenticated');
+
+                return (
+                  <div
+                    {...(!ready && {
+                      'aria-hidden': true,
+                      style: {
+                        opacity: 0,
+                        pointerEvents: 'none',
+                        userSelect: 'none',
+                      },
+                    })}
+                  >
+                    {(() => {
+                      if (!connected) {
+                        return (
+                          <button
+                            onClick={openConnectModal}
+                            className="px-4 py-2 rounded-lg font-bold text-sm transition-all duration-200 hover:scale-105"
+                            style={{
+                              backgroundColor: theme.colors.primary,
+                              color: theme.colors.bg.primary,
+                              boxShadow: `0 0 20px ${theme.colors.primary}40`,
+                            }}
+                          >
+                            Connect
+                          </button>
+                        );
+                      }
+
+                      return (
+                        <button
+                          onClick={openAccountModal}
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium"
+                          style={{
+                            backgroundColor: theme.colors.bg.tertiary,
+                            color: theme.colors.text.primary,
+                            border: `1px solid ${theme.colors.border.default}`,
+                          }}
+                        >
+                          <span
+                            className="w-2 h-2 rounded-full"
+                            style={{ backgroundColor: theme.colors.success }}
+                          />
+                          {/* Show alias (username) if available, otherwise short address */}
+                          {profile?.username || account.displayName}
+                          {account.displayBalance && (
+                            <span style={{ color: theme.colors.warning }}>
+                              {account.displayBalance}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })()}
+                  </div>
+                );
+              }}
+            </ConnectButton.Custom>
 
             {/* Profile mini */}
             {profile && (
@@ -101,6 +176,77 @@ export function TopNavBar({ className = '' }: TopNavBarProps) {
             style={{ borderColor: theme.colors.border.subtle }}
           >
             <NavLinks direction="vertical" />
+
+            {/* Wallet Connection (mobile) */}
+            <div
+              className="mt-4 pt-4 border-t"
+              style={{ borderColor: theme.colors.border.subtle }}
+            >
+              <ConnectButton.Custom>
+                {({
+                  account,
+                  chain,
+                  openAccountModal,
+                  openConnectModal,
+                  authenticationStatus,
+                  mounted,
+                }) => {
+                  const ready = mounted && authenticationStatus !== 'loading';
+                  const connected =
+                    ready &&
+                    account &&
+                    chain &&
+                    (!authenticationStatus || authenticationStatus === 'authenticated');
+
+                  return (
+                    <div
+                      {...(!ready && {
+                        'aria-hidden': true,
+                        style: {
+                          opacity: 0,
+                          pointerEvents: 'none',
+                          userSelect: 'none',
+                        },
+                      })}
+                    >
+                      {!connected ? (
+                        <button
+                          onClick={openConnectModal}
+                          className="w-full px-4 py-2 rounded-lg font-bold text-sm"
+                          style={{
+                            backgroundColor: theme.colors.primary,
+                            color: theme.colors.bg.primary,
+                          }}
+                        >
+                          Connect Wallet
+                        </button>
+                      ) : (
+                        <button
+                          onClick={openAccountModal}
+                          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm"
+                          style={{
+                            backgroundColor: theme.colors.bg.tertiary,
+                            color: theme.colors.text.primary,
+                            border: `1px solid ${theme.colors.border.default}`,
+                          }}
+                        >
+                          <span
+                            className="w-2 h-2 rounded-full"
+                            style={{ backgroundColor: theme.colors.success }}
+                          />
+                          {profile?.username || account.displayName}
+                          {account.displayBalance && (
+                            <span style={{ color: theme.colors.warning }}>
+                              {account.displayBalance}
+                            </span>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  );
+                }}
+              </ConnectButton.Custom>
+            </div>
 
             {/* Profile mini (mobile) */}
             {profile && (
