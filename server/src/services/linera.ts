@@ -97,6 +97,12 @@ export class LineraService extends EventEmitter {
    * Start the linera service process
    */
   async start(): Promise<void> {
+    // In mock mode, don't try to spawn the linera binary
+    if (this.mockMode) {
+      log.info('Running in mock mode - skipping linera service startup');
+      return;
+    }
+
     if (this.serviceProcess && this.isRunning()) {
       log.info('Service is already running');
       return;
