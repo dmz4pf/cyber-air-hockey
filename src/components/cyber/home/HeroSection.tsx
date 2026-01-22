@@ -1,16 +1,14 @@
 'use client';
 
 /**
- * HeroSection - Animated hero with CTA for home page
+ * HeroSection - Minimal hero with title and CTA
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { cyberTheme } from '@/lib/cyber/theme';
 import { useGameStore } from '@/stores/gameStore';
 import { CyberButton } from '../ui/CyberButton';
-import { StatusBadge } from '../ui/StatusBadge';
 
 // Particle configuration
 interface Particle {
@@ -52,18 +50,15 @@ export function HeroSection({ className = '' }: HeroSectionProps) {
   }, []);
 
   const handlePlayNow = () => {
-    // Reset to mode selection and navigate to game page
     goToModeSelection();
     router.push('/game');
   };
 
   return (
-    <>
-
-      <section
-        className={`relative min-h-[70vh] flex items-center justify-center overflow-hidden ${className}`}
-      >
-      {/* Animated background particles - more mobile */}
+    <section
+      className={`relative min-h-[70vh] flex items-center justify-center overflow-hidden ${className}`}
+    >
+      {/* Animated background particles */}
       <div className="absolute inset-0 overflow-hidden">
         {mounted && particles.map((particle) => (
           <div
@@ -94,14 +89,9 @@ export function HeroSection({ className = '' }: HeroSectionProps) {
 
       {/* Content */}
       <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">
-        {/* Status badge */}
-        <div className="flex justify-center mb-6">
-          <StatusBadge status="live" pulse size="md" />
-        </div>
-
         {/* Main heading */}
         <h1
-          className="text-5xl md:text-7xl font-black mb-4 uppercase tracking-wider"
+          className="text-5xl md:text-7xl font-black mb-12 uppercase tracking-wider"
           style={{
             fontFamily: cyberTheme.fonts.heading,
             color: cyberTheme.colors.text.primary,
@@ -112,17 +102,8 @@ export function HeroSection({ className = '' }: HeroSectionProps) {
           <span style={{ color: cyberTheme.colors.primary }}>AIR HOCKEY</span>
         </h1>
 
-        {/* Subheading */}
-        <p
-          className="text-lg md:text-xl mb-8 max-w-2xl mx-auto"
-          style={{ color: cyberTheme.colors.text.secondary }}
-        >
-          Compete in the ultimate futuristic air hockey experience. Climb the ranks,
-          unlock achievements, and prove you&apos;re the best.
-        </p>
-
-        {/* CTA buttons */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+        {/* Centered CTA button */}
+        <div className="flex justify-center">
           <CyberButton
             variant="primary"
             size="lg"
@@ -131,54 +112,6 @@ export function HeroSection({ className = '' }: HeroSectionProps) {
           >
             PLAY NOW
           </CyberButton>
-          <Link href="/leaderboard">
-            <CyberButton variant="secondary" size="lg">
-              VIEW RANKINGS
-            </CyberButton>
-          </Link>
-        </div>
-
-        {/* Stats row */}
-        <div
-          className="mt-12 flex items-center justify-center gap-8 md:gap-16"
-          style={{ color: cyberTheme.colors.text.muted }}
-        >
-          <div className="text-center">
-            <div
-              className="text-3xl font-bold"
-              style={{
-                color: cyberTheme.colors.primary,
-                fontFamily: cyberTheme.fonts.heading,
-              }}
-            >
-              25+
-            </div>
-            <div className="text-sm uppercase tracking-wider">Achievements</div>
-          </div>
-          <div className="text-center">
-            <div
-              className="text-3xl font-bold"
-              style={{
-                color: cyberTheme.colors.primary,
-                fontFamily: cyberTheme.fonts.heading,
-              }}
-            >
-              6
-            </div>
-            <div className="text-sm uppercase tracking-wider">Rank Tiers</div>
-          </div>
-          <div className="text-center">
-            <div
-              className="text-3xl font-bold"
-              style={{
-                color: cyberTheme.colors.primary,
-                fontFamily: cyberTheme.fonts.heading,
-              }}
-            >
-              100
-            </div>
-            <div className="text-sm uppercase tracking-wider">Max Level</div>
-          </div>
         </div>
       </div>
 
@@ -190,7 +123,6 @@ export function HeroSection({ className = '' }: HeroSectionProps) {
         }}
       />
     </section>
-    </>
   );
 }
 

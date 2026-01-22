@@ -5,7 +5,6 @@
  */
 
 import React from 'react';
-import Link from 'next/link';
 import { useThemedStyles } from '@/lib/cyber/useThemedStyles';
 import {
   HeroSection,
@@ -24,22 +23,6 @@ export default function CyberHomePage() {
 
       {/* Content Section */}
       <section className="max-w-7xl mx-auto px-4 py-12">
-        {/* Theme Switcher Link */}
-        <div className="flex justify-center mb-8">
-          <Link
-            href="/theme-preview"
-            className="px-6 py-3 rounded-lg font-semibold uppercase tracking-wider transition-all hover:scale-105"
-            style={{
-              backgroundColor: `${theme.colors.primary}20`,
-              color: theme.colors.primary,
-              border: `1px solid ${theme.colors.primary}`,
-              fontFamily: theme.fonts.heading,
-            }}
-          >
-            Customize Theme
-          </Link>
-        </div>
-
         {/* Season Banner */}
         <SeasonBanner className="mb-8" />
 
