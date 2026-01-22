@@ -18,6 +18,7 @@ export function usePlayerInput({
   const currentPosRef = useRef({ x: PHYSICS_CONFIG.table.width / 2, y: PHYSICS_CONFIG.table.height * 0.85 });
   const isTrackingRef = useRef(false);
   const lastCanvasRectRef = useRef<DOMRect | null>(null);
+  const prevEnabledRef = useRef(enabled);
 
   // Update canvas rect periodically (handles resize)
   const updateCanvasRect = useCallback(() => {
@@ -44,6 +45,10 @@ export function usePlayerInput({
   );
 
   useEffect(() => {
+    // Detect enabled transition from false to true (e.g., after goal countdown)
+    const wasEnabled = prevEnabledRef.current;
+    prevEnabledRef.current = enabled;
+
     if (!enabled) {
       isTrackingRef.current = false;
       return;
@@ -54,6 +59,12 @@ export function usePlayerInput({
 
     // Update canvas rect initially and on resize
     updateCanvasRect();
+
+    // Auto-resume tracking when enabled transitions from false to true
+    // This prevents requiring a click after goals/pauses
+    if (!wasEnabled && enabled) {
+      isTrackingRef.current = true;
+    }
     window.addEventListener('resize', updateCanvasRect);
 
     // Smoothing factor (0 = no smoothing, 1 = instant)

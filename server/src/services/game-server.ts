@@ -619,6 +619,119 @@ export class GameServer {
     this.endingGames.delete(gameId);
     this.startingGames.delete(gameId);
   }
+
+  /**
+   * Handle rematch request from a player
+   * Notifies the other player that opponent wants to play again
+   */
+  handleRematchRequest(ws: WebSocket): void {
+    const roomInfo = roomManager.getRoomByWebSocket(ws);
+    if (!roomInfo) return;
+
+    const { gameId, playerId } = roomInfo;
+    const room = roomManager.getRoom(gameId);
+    if (!room) return;
+
+    // Only allow rematch request when game is ended
+    if (room.state !== 'ended') {
+      console.log(`[GameServer] Rematch request ignored - game not ended (state: ${room.state})`);
+      return;
+    }
+
+    // Check if there's already a pending rematch request
+    if (room.rematchState) {
+      console.log(`[GameServer] Rematch already requested by player ${room.rematchState.requestedBy}`);
+      return;
+    }
+
+    console.log(`[GameServer] Player ${playerId} requested rematch in game ${gameId}`);
+
+    // Store rematch state
+    room.rematchState = {
+      requestedBy: playerId,
+      requestedAt: Date.now()
+    };
+
+    // Notify the other player
+    roomManager.broadcast(gameId, { type: 'rematch-requested' }, playerId);
+  }
+
+  /**
+   * Handle rematch response from the other player
+   */
+  handleRematchResponse(ws: WebSocket, accepted: boolean): void {
+    const roomInfo = roomManager.getRoomByWebSocket(ws);
+    if (!roomInfo) return;
+
+    const { gameId, playerId } = roomInfo;
+    const room = roomManager.getRoom(gameId);
+    if (!room) return;
+
+    // Only process if there's a pending rematch request
+    if (!room.rematchState) {
+      console.log(`[GameServer] No pending rematch request in game ${gameId}`);
+      return;
+    }
+
+    // Make sure this is NOT the player who requested the rematch
+    if (room.rematchState.requestedBy === playerId) {
+      console.log(`[GameServer] Player ${playerId} cannot respond to their own rematch request`);
+      return;
+    }
+
+    console.log(`[GameServer] Player ${playerId} ${accepted ? 'accepted' : 'declined'} rematch in game ${gameId}`);
+
+    if (accepted) {
+      // Both players agreed - reset room for new game
+      room.rematchState = null;
+      room.pauseState = null;
+      room.physicsEngine = null;
+
+      // Reset room state to waiting temporarily, then start countdown
+      roomManager.setRoomState(gameId, 'waiting');
+
+      // Clear any old state locks
+      this.startingGames.delete(gameId);
+      this.endingGames.delete(gameId);
+
+      // Notify both players rematch is starting
+      roomManager.broadcast(gameId, { type: 'rematch-accepted' });
+
+      // Start countdown for new game
+      this.startingGames.add(gameId);
+      this.startCountdown(gameId);
+    } else {
+      // Rematch declined - notify both players
+      room.rematchState = null;
+      roomManager.broadcast(gameId, { type: 'rematch-declined' });
+    }
+  }
+
+  /**
+   * Handle player exit (leaving the post-game screen)
+   * This is different from quit-game which happens during gameplay
+   */
+  handlePlayerExit(ws: WebSocket): void {
+    const roomInfo = roomManager.getRoomByWebSocket(ws);
+    if (!roomInfo) return;
+
+    const { gameId, playerId } = roomInfo;
+    const room = roomManager.getRoom(gameId);
+    if (!room) return;
+
+    console.log(`[GameServer] Player ${playerId} exited game ${gameId}`);
+
+    // Clear any rematch state
+    room.rematchState = null;
+
+    // Notify the other player
+    roomManager.broadcast(gameId, { type: 'opponent-exited' }, playerId);
+
+    // Remove this player from the room
+    roomManager.leaveRoom(gameId, playerId);
+
+    // If room is empty, it will be cleaned up automatically by leaveRoom
+  }
 }
 
 export const gameServer = new GameServer();

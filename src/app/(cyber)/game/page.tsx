@@ -40,6 +40,8 @@ import {
 } from '@/components/cyber/game';
 import { MultiplayerPauseOverlay } from '@/components/cyber/game/MultiplayerPauseOverlay';
 import { OpponentQuitModal } from '@/components/cyber/game/OpponentQuitModal';
+import { MultiplayerGameOverModal } from '@/components/cyber/game/MultiplayerGameOverModal';
+import { RematchRequestModal } from '@/components/cyber/game/RematchRequestModal';
 
 export default function CyberGamePage() {
   const gameCanvasRef = useRef<GameCanvasRef>(null);
@@ -264,12 +266,37 @@ export default function CyberGamePage() {
                     />
                   )}
 
-                  {/* Opponent quit modal */}
+                  {/* Opponent quit modal (mid-game quit) */}
                   {isInMultiplayerGameplay && (
                     <OpponentQuitModal
                       opponentQuit={multiplayerEngine.opponentQuit}
                       playerNumber={playerNumber}
                       onContinue={resetGame}
+                    />
+                  )}
+
+                  {/* Multiplayer game over modal (normal end) */}
+                  {isInMultiplayerGameplay && multiplayerEngine.gameStatus === 'ended' && !multiplayerEngine.opponentQuit.hasQuit && (
+                    <MultiplayerGameOverModal
+                      isVisible={true}
+                      winner={multiplayerEngine.winner}
+                      playerNumber={playerNumber}
+                      finalScore={multiplayerEngine.gameState?.score || null}
+                      rematchState={multiplayerEngine.rematchState}
+                      opponentExited={multiplayerEngine.opponentExited}
+                      onPlayAgain={multiplayerEngine.sendRematchRequest}
+                      onExit={multiplayerEngine.sendPlayerExit}
+                      onResetGame={resetGame}
+                    />
+                  )}
+
+                  {/* Rematch request modal (when opponent wants rematch) */}
+                  {isInMultiplayerGameplay && multiplayerEngine.rematchState.opponentRequested && (
+                    <RematchRequestModal
+                      isVisible={true}
+                      onAccept={() => multiplayerEngine.sendRematchResponse(true)}
+                      onDecline={() => multiplayerEngine.sendRematchResponse(false)}
+                      onResetGame={resetGame}
                     />
                   )}
                 </GameHUD>

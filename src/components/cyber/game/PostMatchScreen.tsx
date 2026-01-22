@@ -190,9 +190,87 @@ export function PostMatchScreen({ className = '' }: PostMatchScreenProps) {
     }
   }, [status]);
 
-  if (status !== 'gameover' || !profile) return null;
+  if (status !== 'gameover') return null;
 
-  const levelProgress = getLevelProgress(profile.level);
+  const levelProgress = profile ? getLevelProgress(profile.level) : 0;
+
+  // Simplified UI when profile is not available (e.g., wallet not connected)
+  if (!profile) {
+    return (
+      <div
+        className={`absolute inset-0 flex items-center justify-center z-40 ${className}`}
+        style={{
+          backgroundColor: 'rgba(5, 5, 16, 0.95)',
+          backdropFilter: 'blur(8px)',
+        }}
+      >
+        <HUDPanel padding="lg" variant="glow" className="w-full max-w-md mx-4">
+          {/* Result header */}
+          <div className="text-center mb-6">
+            <h2
+              className="text-4xl font-black mb-2 uppercase tracking-wider"
+              style={{
+                color: isWin ? cyberTheme.colors.success : cyberTheme.colors.error,
+                fontFamily: cyberTheme.fonts.heading,
+                textShadow: `0 0 30px ${isWin ? cyberTheme.colors.success : cyberTheme.colors.error}`,
+              }}
+            >
+              {isWin ? 'VICTORY!' : 'DEFEAT'}
+            </h2>
+
+            {/* Score */}
+            <div
+              className="flex items-center justify-center gap-4"
+              style={{ color: cyberTheme.colors.text.primary }}
+            >
+              <span
+                className="text-5xl font-black"
+                style={{
+                  color: cyberTheme.colors.player.you,
+                  fontFamily: cyberTheme.fonts.heading,
+                }}
+              >
+                {scores.player1}
+              </span>
+              <span className="text-2xl" style={{ color: cyberTheme.colors.text.muted }}>
+                -
+              </span>
+              <span
+                className="text-5xl font-black"
+                style={{
+                  color: cyberTheme.colors.player.opponent,
+                  fontFamily: cyberTheme.fonts.heading,
+                }}
+              >
+                {scores.player2}
+              </span>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="space-y-3">
+            <CyberButton
+              variant="primary"
+              size="lg"
+              glow
+              onClick={() => {
+                setProcessed(false);
+                startGame();
+              }}
+              className="w-full"
+            >
+              PLAY AGAIN
+            </CyberButton>
+            <Link href="/" className="block">
+              <CyberButton variant="secondary" size="lg" className="w-full">
+                BACK TO HOME
+              </CyberButton>
+            </Link>
+          </div>
+        </HUDPanel>
+      </div>
+    );
+  }
 
   return (
     <div

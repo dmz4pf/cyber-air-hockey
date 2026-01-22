@@ -13,6 +13,11 @@ export interface PauseState {
   gracePeriodTimeout?: NodeJS.Timeout;
 }
 
+export interface RematchState {
+  requestedBy: string; // playerId who requested
+  requestedAt: number;
+}
+
 export interface GameRoom {
   gameId: string;
   players: Map<string, { ws: WebSocket; playerNumber: 1 | 2 }>;
@@ -20,6 +25,7 @@ export interface GameRoom {
   physicsEngine: PhysicsEngine | null;
   broadcastInterval: NodeJS.Timeout | null;
   pauseState: PauseState | null;
+  rematchState: RematchState | null;
 }
 
 export class RoomManager {
@@ -41,6 +47,7 @@ export class RoomManager {
       physicsEngine: null,
       broadcastInterval: null,
       pauseState: null,
+      rematchState: null,
     };
 
     this.rooms.set(gameId, room);

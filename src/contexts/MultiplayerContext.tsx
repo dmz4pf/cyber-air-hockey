@@ -37,6 +37,21 @@ interface OpponentQuitState {
   finalScore: { player1: number; player2: number } | null;
 }
 
+interface RematchState {
+  // true when we have requested a rematch and are waiting for response
+  waitingForResponse: boolean;
+  // true when opponent has requested a rematch and we need to respond
+  opponentRequested: boolean;
+  // true when rematch was accepted and game is restarting
+  accepted: boolean;
+  // true when rematch was declined
+  declined: boolean;
+}
+
+interface OpponentExitedState {
+  hasExited: boolean;
+}
+
 type ServerMessage =
   | { type: 'room-joined'; gameId: string; playerNumber: 1 | 2 }
   | { type: 'opponent-joined'; opponentId: string }
@@ -50,7 +65,11 @@ type ServerMessage =
   | { type: 'game-paused'; reason: PauseReason; pausedBy: 1 | 2 | null; canResume: boolean; gracePeriodMs?: number }
   | { type: 'resume-countdown'; seconds: number }
   | { type: 'game-resumed' }
-  | { type: 'opponent-quit'; winner: 1 | 2; finalScore: { player1: number; player2: number } };
+  | { type: 'opponent-quit'; winner: 1 | 2; finalScore: { player1: number; player2: number } }
+  | { type: 'rematch-requested' }
+  | { type: 'rematch-accepted' }
+  | { type: 'rematch-declined' }
+  | { type: 'opponent-exited' };
 
 interface MultiplayerContextValue {
   // Connection state
@@ -70,6 +89,10 @@ interface MultiplayerContextValue {
   pauseState: PauseState;
   opponentQuit: OpponentQuitState;
 
+  // Rematch state
+  rematchState: RematchState;
+  opponentExited: OpponentExitedState;
+
   // Actions
   connect: (gameId: string, playerId: string) => void;
   disconnect: () => void;
@@ -77,6 +100,9 @@ interface MultiplayerContextValue {
   sendPauseRequest: () => void;
   sendResumeRequest: () => void;
   sendQuitGame: () => void;
+  sendRematchRequest: () => void;
+  sendRematchResponse: (accepted: boolean) => void;
+  sendPlayerExit: () => void;
 }
 
 const MultiplayerContext = createContext<MultiplayerContextValue | null>(null);
@@ -116,6 +142,19 @@ export function MultiplayerProvider({ children }: { children: React.ReactNode })
     hasQuit: false,
     winner: null,
     finalScore: null,
+  });
+
+  // Rematch state
+  const [rematchState, setRematchState] = useState<RematchState>({
+    waitingForResponse: false,
+    opponentRequested: false,
+    accepted: false,
+    declined: false,
+  });
+
+  // Opponent exited state
+  const [opponentExited, setOpponentExited] = useState<OpponentExitedState>({
+    hasExited: false,
   });
 
   // Refs
@@ -203,6 +242,15 @@ export function MultiplayerProvider({ children }: { children: React.ReactNode })
       winner: null,
       finalScore: null,
     });
+    setRematchState({
+      waitingForResponse: false,
+      opponentRequested: false,
+      accepted: false,
+      declined: false,
+    });
+    setOpponentExited({
+      hasExited: false,
+    });
   }, []);
 
   // Send message helper
@@ -258,6 +306,27 @@ export function MultiplayerProvider({ children }: { children: React.ReactNode })
   const sendQuitGame = useCallback(() => {
     console.log('[MultiplayerContext] Sending quit game request');
     sendMessage({ type: 'quit-game' });
+  }, [sendMessage]);
+
+  // Send rematch request
+  const sendRematchRequest = useCallback(() => {
+    console.log('[MultiplayerContext] Sending rematch request');
+    setRematchState(prev => ({ ...prev, waitingForResponse: true }));
+    sendMessage({ type: 'rematch-request' });
+  }, [sendMessage]);
+
+  // Send rematch response
+  const sendRematchResponse = useCallback((accepted: boolean) => {
+    console.log('[MultiplayerContext] Sending rematch response:', accepted);
+    sendMessage({ type: 'rematch-response', accepted });
+    // Clear the opponent requested flag since we responded
+    setRematchState(prev => ({ ...prev, opponentRequested: false }));
+  }, [sendMessage]);
+
+  // Send player exit
+  const sendPlayerExit = useCallback(() => {
+    console.log('[MultiplayerContext] Sending player exit');
+    sendMessage({ type: 'player-exit' });
   }, [sendMessage]);
 
   // Connect to game
@@ -337,6 +406,13 @@ export function MultiplayerProvider({ children }: { children: React.ReactNode })
               setGameStatus('countdown');
               gameStatusRef.current = 'countdown';
               setCountdown(message.seconds);
+              // Reset rematch state when a new game/rematch starts
+              setRematchState({
+                waitingForResponse: false,
+                opponentRequested: false,
+                accepted: false,
+                declined: false,
+              });
               break;
 
             case 'state-update':
@@ -424,6 +500,49 @@ export function MultiplayerProvider({ children }: { children: React.ReactNode })
               gameStatusRef.current = 'ended';
               setGameState((prev) => prev ? { ...prev, score: message.finalScore } : null);
               break;
+
+            case 'rematch-requested':
+              console.log('[MultiplayerContext] Opponent requested rematch');
+              setRematchState(prev => ({ ...prev, opponentRequested: true }));
+              break;
+
+            case 'rematch-accepted':
+              console.log('[MultiplayerContext] Rematch accepted, restarting game');
+              // Reset game state but keep connection
+              setRematchState({
+                waitingForResponse: false,
+                opponentRequested: false,
+                accepted: true,
+                declined: false,
+              });
+              // Reset other game states for new match
+              setWinner(null);
+              setOpponentQuit({ hasQuit: false, winner: null, finalScore: null });
+              setOpponentExited({ hasExited: false });
+              // Server will send countdown messages next
+              break;
+
+            case 'rematch-declined':
+              console.log('[MultiplayerContext] Rematch declined');
+              setRematchState(prev => ({
+                ...prev,
+                waitingForResponse: false,
+                opponentRequested: false,
+                declined: true,
+              }));
+              break;
+
+            case 'opponent-exited':
+              console.log('[MultiplayerContext] Opponent exited');
+              setOpponentExited({ hasExited: true });
+              // Clear any rematch state
+              setRematchState({
+                waitingForResponse: false,
+                opponentRequested: false,
+                accepted: false,
+                declined: false,
+              });
+              break;
           }
         } catch (err) {
           console.error('[MultiplayerContext] Failed to parse message:', err);
@@ -491,12 +610,17 @@ export function MultiplayerProvider({ children }: { children: React.ReactNode })
     winner,
     pauseState,
     opponentQuit,
+    rematchState,
+    opponentExited,
     connect,
     disconnect,
     sendPaddleMove,
     sendPauseRequest,
     sendResumeRequest,
     sendQuitGame,
+    sendRematchRequest,
+    sendRematchResponse,
+    sendPlayerExit,
   };
 
   return (
@@ -514,4 +638,4 @@ export function useMultiplayerContext() {
   return context;
 }
 
-export type { ServerGameState, GameStatus, PauseState, PauseReason, OpponentQuitState };
+export type { ServerGameState, GameStatus, PauseState, PauseReason, OpponentQuitState, RematchState, OpponentExitedState };

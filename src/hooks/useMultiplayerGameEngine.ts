@@ -90,10 +90,15 @@ export function useMultiplayerGameEngine({ gameId, playerId }: UseMultiplayerGam
     winner,
     pauseState,
     opponentQuit,
+    rematchState,
+    opponentExited,
     sendPaddleMove,
     sendPauseRequest,
     sendResumeRequest,
     sendQuitGame,
+    sendRematchRequest,
+    sendRematchResponse,
+    sendPlayerExit,
     connect,
     disconnect,
   } = useMultiplayerContext();
@@ -344,6 +349,10 @@ export function useMultiplayerGameEngine({ gameId, playerId }: UseMultiplayerGam
     pauseState,
     opponentQuit,
 
+    // Rematch state
+    rematchState,
+    opponentExited,
+
     // Rendering interface (compatible with useGameEngine)
     getBodies,
     movePaddle,
@@ -354,6 +363,9 @@ export function useMultiplayerGameEngine({ gameId, playerId }: UseMultiplayerGam
     sendPauseRequest,
     sendResumeRequest,
     sendQuitGame,
+    sendRematchRequest,
+    sendRematchResponse,
+    sendPlayerExit,
     disconnect,
   };
 }

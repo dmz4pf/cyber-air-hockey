@@ -10,7 +10,10 @@ import {
   isPingMessage,
   isPauseRequestMessage,
   isResumeRequestMessage,
-  isQuitGameMessage
+  isQuitGameMessage,
+  isRematchRequestMessage,
+  isRematchResponseMessage,
+  isPlayerExitMessage
 } from './message-types';
 import { GameServer } from '../services/game-server';
 
@@ -127,6 +130,15 @@ function handleMessage(ws: WebSocket, message: ClientMessage, gameServer: GameSe
   } else if (isQuitGameMessage(message)) {
     console.log('[WebSocket] Quit game request received');
     gameServer.handleQuitGame(ws);
+  } else if (isRematchRequestMessage(message)) {
+    console.log('[WebSocket] Rematch request received');
+    gameServer.handleRematchRequest(ws);
+  } else if (isRematchResponseMessage(message)) {
+    console.log('[WebSocket] Rematch response received:', message.accepted);
+    gameServer.handleRematchResponse(ws, message.accepted);
+  } else if (isPlayerExitMessage(message)) {
+    console.log('[WebSocket] Player exit received');
+    gameServer.handlePlayerExit(ws);
   }
 }
 
