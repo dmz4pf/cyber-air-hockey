@@ -68,6 +68,19 @@ export interface QuitGameMessage {
   type: 'quit-game';
 }
 
+export interface RematchRequestMessage {
+  type: 'rematch-request';
+}
+
+export interface RematchResponseMessage {
+  type: 'rematch-response';
+  accepted: boolean;
+}
+
+export interface PlayerExitMessage {
+  type: 'player-exit';
+}
+
 export type ClientMessage =
   | JoinRoomMessage
   | PaddleMoveMessage
@@ -75,7 +88,10 @@ export type ClientMessage =
   | PingMessage
   | PauseRequestMessage
   | ResumeRequestMessage
-  | QuitGameMessage;
+  | QuitGameMessage
+  | RematchRequestMessage
+  | RematchResponseMessage
+  | PlayerExitMessage;
 
 // =============================================================================
 // Server → Client Messages
@@ -157,6 +173,22 @@ export interface OpponentQuitMessage {
   finalScore: Score;
 }
 
+export interface RematchRequestedMessage {
+  type: 'rematch-requested';
+}
+
+export interface RematchAcceptedMessage {
+  type: 'rematch-accepted';
+}
+
+export interface RematchDeclinedMessage {
+  type: 'rematch-declined';
+}
+
+export interface OpponentExitedMessage {
+  type: 'opponent-exited';
+}
+
 export type ServerMessage =
   | RoomJoinedMessage
   | OpponentJoinedMessage
@@ -170,7 +202,11 @@ export type ServerMessage =
   | GamePausedMessage
   | ResumeCountdownMessage
   | GameResumedMessage
-  | OpponentQuitMessage;
+  | OpponentQuitMessage
+  | RematchRequestedMessage
+  | RematchAcceptedMessage
+  | RematchDeclinedMessage
+  | OpponentExitedMessage;
 
 // =============================================================================
 // Type Guards - Client Messages
@@ -238,6 +274,31 @@ export function isQuitGameMessage(msg: unknown): msg is QuitGameMessage {
   );
 }
 
+export function isRematchRequestMessage(msg: unknown): msg is RematchRequestMessage {
+  return (
+    typeof msg === 'object' &&
+    msg !== null &&
+    (msg as RematchRequestMessage).type === 'rematch-request'
+  );
+}
+
+export function isRematchResponseMessage(msg: unknown): msg is RematchResponseMessage {
+  return (
+    typeof msg === 'object' &&
+    msg !== null &&
+    (msg as RematchResponseMessage).type === 'rematch-response' &&
+    typeof (msg as RematchResponseMessage).accepted === 'boolean'
+  );
+}
+
+export function isPlayerExitMessage(msg: unknown): msg is PlayerExitMessage {
+  return (
+    typeof msg === 'object' &&
+    msg !== null &&
+    (msg as PlayerExitMessage).type === 'player-exit'
+  );
+}
+
 export function isClientMessage(msg: unknown): msg is ClientMessage {
   return (
     isJoinRoomMessage(msg) ||
@@ -246,7 +307,10 @@ export function isClientMessage(msg: unknown): msg is ClientMessage {
     isPingMessage(msg) ||
     isPauseRequestMessage(msg) ||
     isResumeRequestMessage(msg) ||
-    isQuitGameMessage(msg)
+    isQuitGameMessage(msg) ||
+    isRematchRequestMessage(msg) ||
+    isRematchResponseMessage(msg) ||
+    isPlayerExitMessage(msg)
   );
 }
 
@@ -364,6 +428,9 @@ export const CLIENT_MESSAGE_TYPES = [
   'pause-request',
   'resume-request',
   'quit-game',
+  'rematch-request',
+  'rematch-response',
+  'player-exit',
 ] as const;
 
 export const SERVER_MESSAGE_TYPES = [
@@ -380,6 +447,10 @@ export const SERVER_MESSAGE_TYPES = [
   'resume-countdown',
   'game-resumed',
   'opponent-quit',
+  'rematch-requested',
+  'rematch-accepted',
+  'rematch-declined',
+  'opponent-exited',
 ] as const;
 
 export type ClientMessageType = (typeof CLIENT_MESSAGE_TYPES)[number];
