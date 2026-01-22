@@ -31,6 +31,25 @@ export function ScoreOverlay({ className = '' }: ScoreOverlayProps) {
       ? 'Medium AI'
       : 'Hard AI';
 
+  // Dynamic colors based on who's winning
+  const player1Winning = scores.player1 > scores.player2;
+  const player2Winning = scores.player2 > scores.player1;
+  const isTied = scores.player1 === scores.player2;
+
+  // Player 1 color: green if winning, red if losing, neutral (primary blue) if tied
+  const player1Color = isTied
+    ? cyberTheme.colors.primary
+    : player1Winning
+      ? cyberTheme.colors.success
+      : cyberTheme.colors.error;
+
+  // Player 2 color: green if winning, red if losing, neutral (primary blue) if tied
+  const player2Color = isTied
+    ? cyberTheme.colors.primary
+    : player2Winning
+      ? cyberTheme.colors.success
+      : cyberTheme.colors.error;
+
   return (
     <div className={`w-full ${className}`}>
       {/* Score bar */}
@@ -46,17 +65,17 @@ export function ScoreOverlay({ className = '' }: ScoreOverlayProps) {
           <div
             className="px-4 py-2 rounded-lg"
             style={{
-              backgroundColor: `${cyberTheme.colors.player.you}15`,
-              border: `2px solid ${cyberTheme.colors.player.you}`,
-              boxShadow: `0 0 15px ${cyberTheme.colors.player.you}40`,
+              backgroundColor: `${player1Color}15`,
+              border: `2px solid ${player1Color}`,
+              boxShadow: `0 0 15px ${player1Color}40`,
             }}
           >
             <div
               className="text-4xl font-black tabular-nums"
               style={{
-                color: cyberTheme.colors.player.you,
+                color: player1Color,
                 fontFamily: cyberTheme.fonts.heading,
-                textShadow: `0 0 15px ${cyberTheme.colors.player.you}`,
+                textShadow: `0 0 15px ${player1Color}`,
               }}
             >
               {scores.player1}
@@ -66,7 +85,7 @@ export function ScoreOverlay({ className = '' }: ScoreOverlayProps) {
             <div
               className="text-sm font-bold uppercase tracking-wider"
               style={{
-                color: cyberTheme.colors.player.you,
+                color: player1Color,
                 fontFamily: cyberTheme.fonts.heading,
               }}
             >
@@ -102,7 +121,7 @@ export function ScoreOverlay({ className = '' }: ScoreOverlayProps) {
             <div
               className="text-sm font-bold uppercase tracking-wider"
               style={{
-                color: cyberTheme.colors.player.opponent,
+                color: player2Color,
                 fontFamily: cyberTheme.fonts.heading,
               }}
             >
@@ -118,17 +137,17 @@ export function ScoreOverlay({ className = '' }: ScoreOverlayProps) {
           <div
             className="px-4 py-2 rounded-lg"
             style={{
-              backgroundColor: `${cyberTheme.colors.player.opponent}15`,
-              border: `2px solid ${cyberTheme.colors.player.opponent}`,
-              boxShadow: `0 0 15px ${cyberTheme.colors.player.opponent}40`,
+              backgroundColor: `${player2Color}15`,
+              border: `2px solid ${player2Color}`,
+              boxShadow: `0 0 15px ${player2Color}40`,
             }}
           >
             <div
               className="text-4xl font-black tabular-nums"
               style={{
-                color: cyberTheme.colors.player.opponent,
+                color: player2Color,
                 fontFamily: cyberTheme.fonts.heading,
-                textShadow: `0 0 15px ${cyberTheme.colors.player.opponent}`,
+                textShadow: `0 0 15px ${player2Color}`,
               }}
             >
               {scores.player2}

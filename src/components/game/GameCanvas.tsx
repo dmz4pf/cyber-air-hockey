@@ -23,10 +23,16 @@ export interface GameCanvasRef {
   canvas: HTMLCanvasElement | null;
 }
 
+// Puck trail configuration
+const TRAIL_LENGTH = 12; // Number of trail points
+const TRAIL_FADE_RATE = 0.85; // How quickly opacity fades (0-1)
+
 export const GameCanvas = forwardRef<GameCanvasRef, GameCanvasProps>(
   function GameCanvas({ getBodies }, ref) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const animationRef = useRef<number>(0);
+    // Store puck position history for trail effect
+    const puckTrailRef = useRef<{ x: number; y: number }[]>([]);
 
     useImperativeHandle(ref, () => ({
       canvas: canvasRef.current,
@@ -88,6 +94,27 @@ export const GameCanvas = forwardRef<GameCanvasRef, GameCanvasProps>(
       }
 
       const { puck, paddle1, paddle2 } = bodies;
+
+      // Update puck trail history
+      const trail = puckTrailRef.current;
+      trail.unshift({ x: puck.position.x, y: puck.position.y });
+      if (trail.length > TRAIL_LENGTH) {
+        trail.pop();
+      }
+
+      // Draw puck trail (before the puck itself)
+      ctx.save();
+      for (let i = trail.length - 1; i >= 1; i--) {
+        const point = trail[i];
+        const opacity = Math.pow(TRAIL_FADE_RATE, i) * 0.6;
+        const size = puckConfig.radius * (1 - i / trail.length * 0.5);
+
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+        ctx.fill();
+      }
+      ctx.restore();
 
       // Draw puck with glow
       ctx.save();
