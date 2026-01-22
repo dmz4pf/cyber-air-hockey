@@ -1,11 +1,10 @@
 'use client';
 
 /**
- * TopNavBar - Theme-aware navigation bar with RainbowKit wallet connection
+ * TopNavBar - Theme-aware navigation bar
  */
 
 import React, { useState } from 'react';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useThemedStyles } from '@/lib/cyber/useThemedStyles';
 import { usePlayerStore } from '@/stores/playerStore';
 import { Logo } from './Logo';
@@ -38,116 +37,6 @@ export function TopNavBar({ className = '' }: TopNavBarProps) {
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-6">
             <NavLinks />
-
-            {/* RainbowKit Wallet Connection */}
-            <ConnectButton.Custom>
-              {({
-                account,
-                chain,
-                openAccountModal,
-                openChainModal,
-                openConnectModal,
-                authenticationStatus,
-                mounted,
-              }) => {
-                const ready = mounted && authenticationStatus !== 'loading';
-                const connected =
-                  ready &&
-                  account &&
-                  chain &&
-                  (!authenticationStatus || authenticationStatus === 'authenticated');
-
-                return (
-                  <div
-                    {...(!ready && {
-                      'aria-hidden': true,
-                      style: {
-                        opacity: 0,
-                        pointerEvents: 'none',
-                        userSelect: 'none',
-                      },
-                    })}
-                  >
-                    {(() => {
-                      if (!connected) {
-                        return (
-                          <button
-                            onClick={openConnectModal}
-                            className="px-4 py-2 rounded-lg font-bold text-sm transition-all duration-200 hover:scale-105"
-                            style={{
-                              backgroundColor: theme.colors.primary,
-                              color: theme.colors.bg.primary,
-                              boxShadow: `0 0 20px ${theme.colors.primary}40`,
-                            }}
-                          >
-                            Connect
-                          </button>
-                        );
-                      }
-
-                      if (chain.unsupported) {
-                        return (
-                          <button
-                            onClick={openChainModal}
-                            className="px-4 py-2 rounded-lg font-bold text-sm"
-                            style={{
-                              backgroundColor: theme.colors.error,
-                              color: 'white',
-                            }}
-                          >
-                            Wrong network
-                          </button>
-                        );
-                      }
-
-                      return (
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={openChainModal}
-                            className="flex items-center gap-1 px-2 py-1 rounded text-xs"
-                            style={{
-                              backgroundColor: theme.colors.bg.tertiary,
-                              color: theme.colors.text.secondary,
-                              border: `1px solid ${theme.colors.border.default}`,
-                            }}
-                          >
-                            {chain.hasIcon && chain.iconUrl && (
-                              <img
-                                alt={chain.name ?? 'Chain icon'}
-                                src={chain.iconUrl}
-                                className="w-4 h-4"
-                              />
-                            )}
-                            {chain.name}
-                          </button>
-
-                          <button
-                            onClick={openAccountModal}
-                            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-mono"
-                            style={{
-                              backgroundColor: theme.colors.bg.tertiary,
-                              color: theme.colors.success,
-                              border: `1px solid ${theme.colors.border.default}`,
-                            }}
-                          >
-                            <span
-                              className="w-2 h-2 rounded-full animate-pulse"
-                              style={{ backgroundColor: theme.colors.success }}
-                            />
-                            {account.displayName}
-                            {account.displayBalance && (
-                              <span style={{ color: theme.colors.warning }}>
-                                {account.displayBalance}
-                              </span>
-                            )}
-                          </button>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                );
-              }}
-            </ConnectButton.Custom>
 
             {/* Profile mini */}
             {profile && (
@@ -212,14 +101,6 @@ export function TopNavBar({ className = '' }: TopNavBarProps) {
             style={{ borderColor: theme.colors.border.subtle }}
           >
             <NavLinks direction="vertical" />
-
-            {/* RainbowKit Wallet Connection (mobile) */}
-            <div
-              className="mt-4 pt-4 border-t"
-              style={{ borderColor: theme.colors.border.subtle }}
-            >
-              <ConnectButton />
-            </div>
 
             {/* Profile mini (mobile) */}
             {profile && (
