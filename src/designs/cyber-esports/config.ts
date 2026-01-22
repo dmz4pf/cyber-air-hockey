@@ -9,7 +9,7 @@ export const cyberEsportsConfig: DesignConfig = {
     background: '#030712',
     backgroundSecondary: '#111827',
     surface: '#1f2937',
-    border: '#6366f1',
+    border: '#0284C7',
 
     player1: '#10b981',
     player1Glow: '#10b981',
@@ -17,11 +17,11 @@ export const cyberEsportsConfig: DesignConfig = {
     player2Glow: '#f43f5e',
 
     puck: '#f8fafc',
-    puckGlow: '#8b5cf6',
+    puckGlow: '#0EA5E9',
 
     text: '#f8fafc',
     textMuted: '#6b7280',
-    accent: '#8b5cf6',
+    accent: '#0EA5E9',
 
     goalZone1: '#10b98130',
     goalZone2: '#f43f5e30',

@@ -20,9 +20,9 @@ export const midnightClubConfig: DesignConfig = {
     player1: '#f4e5c3',
     player1Glow: '#d4af37',
     
-    // Player 2: Deep burgundy/wine with subtle purple glow
+    // Player 2: Deep burgundy/wine with warm rose glow
     player2: '#8b2846',
-    player2Glow: '#a855f7',
+    player2Glow: '#c73b5e',
     
     // Puck: Bright gold with warm champagne glow
     puck: '#ffd700',
