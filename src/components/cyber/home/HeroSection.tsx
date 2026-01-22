@@ -156,30 +156,6 @@ export function HeroSection({ className = '' }: HeroSectionProps) {
         }}
       />
 
-      {/* Animated scan line */}
-      <motion.div
-        className="absolute inset-0 pointer-events-none overflow-hidden"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 0.3 }}
-        transition={{ delay: 0.5, duration: 1 }}
-      >
-        <motion.div
-          className="absolute left-0 right-0 h-[2px]"
-          style={{
-            background: `linear-gradient(90deg, transparent, ${cyberTheme.colors.primary}, transparent)`,
-            boxShadow: `0 0 20px ${cyberTheme.colors.primary}`,
-          }}
-          animate={{
-            top: ['0%', '100%'],
-          }}
-          transition={{
-            duration: 3,
-            repeat: Infinity,
-            ease: 'linear',
-          }}
-        />
-      </motion.div>
-
       {/* Content */}
       <motion.div
         className="relative z-10 text-center px-4 max-w-4xl mx-auto"
@@ -190,7 +166,7 @@ export function HeroSection({ className = '' }: HeroSectionProps) {
         {/* Main heading with glitch effect */}
         <motion.div className="relative mb-6" variants={titleVariants}>
           <h1
-            className="text-5xl md:text-7xl font-black uppercase tracking-wider"
+            className="text-6xl md:text-8xl font-black uppercase tracking-wider"
             style={{
               fontFamily: cyberTheme.fonts.heading,
               color: cyberTheme.colors.text.primary,
@@ -273,7 +249,7 @@ export function HeroSection({ className = '' }: HeroSectionProps) {
             variants={lineVariants}
           />
 
-          {/* Puck with pulse */}
+          {/* Puck with pulse - Gaming enhanced */}
           <motion.div
             className="relative"
             variants={puckVariants}
@@ -282,34 +258,34 @@ export function HeroSection({ className = '' }: HeroSectionProps) {
               className="w-3 h-3 rounded-full"
               style={{
                 backgroundColor: cyberTheme.colors.text.primary,
-                boxShadow: `0 0 12px ${cyberTheme.colors.primary}, 0 0 24px ${cyberTheme.colors.primary}50`,
+                boxShadow: `0 0 16px ${cyberTheme.colors.primary}, 0 0 32px ${cyberTheme.colors.primary}60`,
               }}
               animate={{
-                scale: [1, 1.2, 1],
+                scale: [1, 1.3, 1],
                 boxShadow: [
-                  `0 0 12px ${cyberTheme.colors.primary}, 0 0 24px ${cyberTheme.colors.primary}50`,
-                  `0 0 20px ${cyberTheme.colors.primary}, 0 0 40px ${cyberTheme.colors.primary}80`,
-                  `0 0 12px ${cyberTheme.colors.primary}, 0 0 24px ${cyberTheme.colors.primary}50`,
+                  `0 0 16px ${cyberTheme.colors.primary}, 0 0 32px ${cyberTheme.colors.primary}60`,
+                  `0 0 28px ${cyberTheme.colors.primary}, 0 0 56px ${cyberTheme.colors.primary}90`,
+                  `0 0 16px ${cyberTheme.colors.primary}, 0 0 32px ${cyberTheme.colors.primary}60`,
                 ],
               }}
               transition={{
-                duration: 2,
+                duration: 1.5,
                 repeat: Infinity,
                 ease: 'easeInOut',
               }}
             />
-            {/* Ripple effect */}
+            {/* Ripple effect - more vibrant */}
             <motion.div
               className="absolute inset-0 rounded-full"
               style={{
-                border: `1px solid ${cyberTheme.colors.primary}`,
+                border: `2px solid ${cyberTheme.colors.primary}`,
               }}
               animate={{
-                scale: [1, 3],
-                opacity: [0.6, 0],
+                scale: [1, 3.5],
+                opacity: [0.8, 0],
               }}
               transition={{
-                duration: 1.5,
+                duration: 1.2,
                 repeat: Infinity,
                 ease: 'easeOut',
               }}
@@ -366,36 +342,6 @@ export function HeroSection({ className = '' }: HeroSectionProps) {
             </CyberButton>
           </motion.div>
         </motion.div>
-
-        {/* Decorative corner brackets */}
-        <motion.div
-          className="absolute -top-8 -left-8 w-16 h-16 border-l-2 border-t-2 opacity-30"
-          style={{ borderColor: cyberTheme.colors.primary }}
-          initial={{ opacity: 0, scale: 0.5 }}
-          animate={{ opacity: 0.3, scale: 1 }}
-          transition={{ delay: 1.5, duration: 0.5 }}
-        />
-        <motion.div
-          className="absolute -top-8 -right-8 w-16 h-16 border-r-2 border-t-2 opacity-30"
-          style={{ borderColor: cyberTheme.colors.primary }}
-          initial={{ opacity: 0, scale: 0.5 }}
-          animate={{ opacity: 0.3, scale: 1 }}
-          transition={{ delay: 1.6, duration: 0.5 }}
-        />
-        <motion.div
-          className="absolute -bottom-8 -left-8 w-16 h-16 border-l-2 border-b-2 opacity-30"
-          style={{ borderColor: cyberTheme.colors.primary }}
-          initial={{ opacity: 0, scale: 0.5 }}
-          animate={{ opacity: 0.3, scale: 1 }}
-          transition={{ delay: 1.7, duration: 0.5 }}
-        />
-        <motion.div
-          className="absolute -bottom-8 -right-8 w-16 h-16 border-r-2 border-b-2 opacity-30"
-          style={{ borderColor: cyberTheme.colors.primary }}
-          initial={{ opacity: 0, scale: 0.5 }}
-          animate={{ opacity: 0.3, scale: 1 }}
-          transition={{ delay: 1.8, duration: 0.5 }}
-        />
       </motion.div>
 
       {/* Bottom gradient */}
