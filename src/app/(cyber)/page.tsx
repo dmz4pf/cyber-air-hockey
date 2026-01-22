@@ -12,13 +12,17 @@ import {
   ProfilePreview,
   LeaderboardTeaser,
   SeasonBanner,
+  ParticleBackground,
 } from '@/components/cyber/home';
 
 export default function CyberHomePage() {
   const theme = useThemedStyles();
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen relative">
+      {/* Global Particle Background */}
+      <ParticleBackground particleCount={50} />
+
       {/* Hero Section */}
       <HeroSection />
 
