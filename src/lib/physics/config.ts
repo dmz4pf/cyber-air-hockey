@@ -6,10 +6,10 @@ export const PHYSICS_CONFIG: PhysicsConfig = {
   },
 
   table: {
-    width: 400,
-    height: 600,
+    width: 500,
+    height: 750,
     wallThickness: 20,
-    goalWidth: 150,
+    goalWidth: 188,  // Proportional to new width (37.5%)
   },
 
   puck: {

@@ -33,8 +33,8 @@ const PADDLE_TRAIL_FADE_RATE = 0.75;
 
 // Paddle glow animation
 const GLOW_PULSE_SPEED = 0.003; // Speed of pulsing
-const GLOW_MIN = 15;
-const GLOW_MAX = 30;
+const GLOW_MIN = 25;  // Increased from 15
+const GLOW_MAX = 50;  // Increased from 30
 
 // Contact flash duration (ms)
 const CONTACT_FLASH_DURATION = 150;
