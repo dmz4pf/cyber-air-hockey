@@ -189,8 +189,9 @@ async function startServer(): Promise<void> {
     await lineraService.start();
     console.log('[Server] Linera service ready on port ' + LINERA_SERVICE_PORT);
   } catch (error) {
-    console.error('[Server] Failed to start Linera service:', error);
-    process.exit(1);
+    // Don't crash on Linera failure - run in mock mode instead
+    console.warn('[Server] Linera service failed to start, running in mock mode:', error);
+    console.warn('[Server] Multiplayer will work, but blockchain features are disabled');
   }
 
   // Start the Linera queue processor for retry mechanism
