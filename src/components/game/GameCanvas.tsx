@@ -33,11 +33,66 @@ const PADDLE_TRAIL_FADE_RATE = 0.75;
 
 // Paddle glow animation
 const GLOW_PULSE_SPEED = 0.003; // Speed of pulsing
-const GLOW_MIN = 25;  // Increased from 15
-const GLOW_MAX = 50;  // Increased from 30
+const GLOW_MIN = 25;
+const GLOW_MAX = 50;
 
 // Contact flash duration (ms)
 const CONTACT_FLASH_DURATION = 150;
+
+// ============================================================================
+// BACKGROUND EFFECTS CONFIGURATION
+// ============================================================================
+
+// Neon grid configuration
+const GRID_SIZE = 40; // Size of each grid cell
+const GRID_COLOR = 'rgba(29, 78, 216, 0.15)'; // Subtle blue grid
+const GRID_GLOW_COLOR = 'rgba(29, 78, 216, 0.3)';
+
+// Floating particles configuration
+const PARTICLE_COUNT = 25;
+const PARTICLE_MIN_SIZE = 1;
+const PARTICLE_MAX_SIZE = 3;
+const PARTICLE_MIN_SPEED = 0.2;
+const PARTICLE_MAX_SPEED = 0.8;
+const PARTICLE_COLOR = 'rgba(147, 197, 253, 0.6)'; // Light blue
+
+// Border glow configuration
+const BORDER_GLOW_MIN = 8;
+const BORDER_GLOW_MAX = 20;
+const BORDER_PULSE_SPEED = 0.002;
+const BORDER_COLOR = '#1D4ED8'; // Primary blue
+
+// Center elements pulse configuration
+const CENTER_PULSE_SPEED = 0.002;
+const CENTER_GLOW_MIN = 5;
+const CENTER_GLOW_MAX = 15;
+const CENTER_COLOR = 'rgba(59, 130, 246, 0.5)'; // Blue
+
+// Particle interface
+interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  size: number;
+  opacity: number;
+}
+
+// Initialize particles
+function createParticles(width: number, height: number): Particle[] {
+  const particles: Particle[] = [];
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    particles.push({
+      x: Math.random() * width,
+      y: Math.random() * height,
+      vx: (Math.random() - 0.5) * (PARTICLE_MAX_SPEED - PARTICLE_MIN_SPEED) + PARTICLE_MIN_SPEED,
+      vy: (Math.random() - 0.5) * (PARTICLE_MAX_SPEED - PARTICLE_MIN_SPEED) + PARTICLE_MIN_SPEED,
+      size: Math.random() * (PARTICLE_MAX_SIZE - PARTICLE_MIN_SIZE) + PARTICLE_MIN_SIZE,
+      opacity: Math.random() * 0.5 + 0.3,
+    });
+  }
+  return particles;
+}
 
 export const GameCanvas = forwardRef<GameCanvasRef, GameCanvasProps>(
   function GameCanvas({ getBodies }, ref) {
@@ -55,6 +110,8 @@ export const GameCanvas = forwardRef<GameCanvasRef, GameCanvasProps>(
     const paddle2ContactRef = useRef<number>(0);
     // Track previous puck position to detect new collisions
     const lastPuckPosRef = useRef<{ x: number; y: number } | null>(null);
+    // Floating particles for background
+    const particlesRef = useRef<Particle[] | null>(null);
 
     useImperativeHandle(ref, () => ({
       canvas: canvasRef.current,
@@ -66,30 +123,97 @@ export const GameCanvas = forwardRef<GameCanvasRef, GameCanvasProps>(
       if (!canvas || !ctx) return;
 
       const { table, paddle, puck: puckConfig } = PHYSICS_CONFIG;
+      const now = performance.now();
+
+      // Initialize particles on first draw
+      if (!particlesRef.current) {
+        particlesRef.current = createParticles(table.width, table.height);
+      }
+
+      // Calculate pulse values for animations
+      const borderPulse = Math.sin(now * BORDER_PULSE_SPEED);
+      const borderGlow = BORDER_GLOW_MIN + (BORDER_GLOW_MAX - BORDER_GLOW_MIN) * (0.5 + 0.5 * borderPulse);
+      const centerPulse = Math.sin(now * CENTER_PULSE_SPEED);
+      const centerGlow = CENTER_GLOW_MIN + (CENTER_GLOW_MAX - CENTER_GLOW_MIN) * (0.5 + 0.5 * centerPulse);
+      const centerOpacity = 0.3 + 0.2 * (0.5 + 0.5 * centerPulse);
+
+      // ========================================================================
+      // BACKGROUND
+      // ========================================================================
 
       // Clear canvas with dark background
-      ctx.fillStyle = '#1a1a2e';
+      ctx.fillStyle = '#0a0a1a';
       ctx.fillRect(0, 0, table.width, table.height);
 
-      // Draw goal zones (bright colored areas)
-      const goalWidth = table.goalWidth;
-      const goalX = (table.width - goalWidth) / 2;
+      // ========================================================================
+      // NEON GRID
+      // ========================================================================
+      ctx.save();
+      ctx.strokeStyle = GRID_COLOR;
+      ctx.lineWidth = 1;
 
-      // Top goal zone (red - AI/Player 2 defends this)
-      ctx.fillStyle = '#ff000050';
-      ctx.fillRect(goalX, 0, goalWidth, 25);
-      ctx.strokeStyle = '#ff0000';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(goalX, 0, goalWidth, 25);
+      // Vertical lines
+      for (let x = GRID_SIZE; x < table.width; x += GRID_SIZE) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, table.height);
+        ctx.stroke();
+      }
 
-      // Bottom goal zone (green - Player 1 defends this)
-      ctx.fillStyle = '#00ff0050';
-      ctx.fillRect(goalX, table.height - 25, goalWidth, 25);
-      ctx.strokeStyle = '#00ff00';
-      ctx.strokeRect(goalX, table.height - 25, goalWidth, 25);
+      // Horizontal lines
+      for (let y = GRID_SIZE; y < table.height; y += GRID_SIZE) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(table.width, y);
+        ctx.stroke();
+      }
 
-      // Draw center line
-      ctx.strokeStyle = '#ffffff30';
+      // Add subtle glow at intersections
+      ctx.fillStyle = GRID_GLOW_COLOR;
+      for (let x = GRID_SIZE; x < table.width; x += GRID_SIZE) {
+        for (let y = GRID_SIZE; y < table.height; y += GRID_SIZE) {
+          ctx.beginPath();
+          ctx.arc(x, y, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.restore();
+
+      // ========================================================================
+      // ANIMATED PARTICLES
+      // ========================================================================
+      ctx.save();
+      const particles = particlesRef.current;
+      for (const particle of particles) {
+        // Update particle position
+        particle.x += particle.vx;
+        particle.y += particle.vy;
+
+        // Wrap around edges
+        if (particle.x < 0) particle.x = table.width;
+        if (particle.x > table.width) particle.x = 0;
+        if (particle.y < 0) particle.y = table.height;
+        if (particle.y > table.height) particle.y = 0;
+
+        // Draw particle with glow
+        ctx.beginPath();
+        ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(147, 197, 253, ${particle.opacity})`;
+        ctx.shadowColor = 'rgba(147, 197, 253, 0.8)';
+        ctx.shadowBlur = 5;
+        ctx.fill();
+      }
+      ctx.restore();
+
+      // ========================================================================
+      // PULSING CENTER ELEMENTS
+      // ========================================================================
+
+      // Draw center line with pulsing glow
+      ctx.save();
+      ctx.shadowColor = CENTER_COLOR;
+      ctx.shadowBlur = centerGlow;
+      ctx.strokeStyle = `rgba(59, 130, 246, ${centerOpacity})`;
       ctx.lineWidth = 2;
       ctx.setLineDash([10, 10]);
       ctx.beginPath();
@@ -97,16 +221,96 @@ export const GameCanvas = forwardRef<GameCanvasRef, GameCanvasProps>(
       ctx.lineTo(table.width, table.height / 2);
       ctx.stroke();
       ctx.setLineDash([]);
+      ctx.restore();
 
-      // Draw center circle
+      // Draw center circle with pulsing glow
+      ctx.save();
+      ctx.shadowColor = CENTER_COLOR;
+      ctx.shadowBlur = centerGlow;
+      ctx.strokeStyle = `rgba(59, 130, 246, ${centerOpacity})`;
+      ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(table.width / 2, table.height / 2, 50, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Draw table border
-      ctx.strokeStyle = '#4a5568';
-      ctx.lineWidth = 4;
+      // Inner dot at center
+      ctx.fillStyle = `rgba(59, 130, 246, ${centerOpacity * 0.8})`;
+      ctx.beginPath();
+      ctx.arc(table.width / 2, table.height / 2, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // ========================================================================
+      // GOAL ZONES
+      // ========================================================================
+      const goalWidth = table.goalWidth;
+      const goalX = (table.width - goalWidth) / 2;
+
+      // Top goal zone (red - AI/Player 2 defends this)
+      ctx.fillStyle = 'rgba(255, 0, 0, 0.15)';
+      ctx.fillRect(goalX, 0, goalWidth, 30);
+      ctx.save();
+      ctx.shadowColor = '#ff0000';
+      ctx.shadowBlur = 10;
+      ctx.strokeStyle = '#ff0000';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(goalX, 0, goalWidth, 30);
+      ctx.restore();
+
+      // Bottom goal zone (green - Player 1 defends this)
+      ctx.fillStyle = 'rgba(0, 255, 0, 0.15)';
+      ctx.fillRect(goalX, table.height - 30, goalWidth, 30);
+      ctx.save();
+      ctx.shadowColor = '#00ff00';
+      ctx.shadowBlur = 10;
+      ctx.strokeStyle = '#00ff00';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(goalX, table.height - 30, goalWidth, 30);
+      ctx.restore();
+
+      // ========================================================================
+      // GLOWING ANIMATED BORDER
+      // ========================================================================
+      ctx.save();
+      ctx.shadowColor = BORDER_COLOR;
+      ctx.shadowBlur = borderGlow;
+      ctx.strokeStyle = BORDER_COLOR;
+      ctx.lineWidth = 3;
       ctx.strokeRect(2, 2, table.width - 4, table.height - 4);
+
+      // Add corner accents
+      const cornerSize = 20;
+      ctx.lineWidth = 4;
+      ctx.shadowBlur = borderGlow * 1.5;
+
+      // Top-left corner
+      ctx.beginPath();
+      ctx.moveTo(2, cornerSize);
+      ctx.lineTo(2, 2);
+      ctx.lineTo(cornerSize, 2);
+      ctx.stroke();
+
+      // Top-right corner
+      ctx.beginPath();
+      ctx.moveTo(table.width - cornerSize, 2);
+      ctx.lineTo(table.width - 2, 2);
+      ctx.lineTo(table.width - 2, cornerSize);
+      ctx.stroke();
+
+      // Bottom-left corner
+      ctx.beginPath();
+      ctx.moveTo(2, table.height - cornerSize);
+      ctx.lineTo(2, table.height - 2);
+      ctx.lineTo(cornerSize, table.height - 2);
+      ctx.stroke();
+
+      // Bottom-right corner
+      ctx.beginPath();
+      ctx.moveTo(table.width - cornerSize, table.height - 2);
+      ctx.lineTo(table.width - 2, table.height - 2);
+      ctx.lineTo(table.width - 2, table.height - cornerSize);
+      ctx.stroke();
+      ctx.restore();
 
       // Get physics bodies
       const bodies = getBodies();
@@ -116,7 +320,6 @@ export const GameCanvas = forwardRef<GameCanvasRef, GameCanvasProps>(
       }
 
       const { puck, paddle1, paddle2 } = bodies;
-      const now = performance.now();
       timeRef.current = now;
 
       // Calculate pulsing glow intensity
