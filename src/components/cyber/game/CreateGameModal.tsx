@@ -12,6 +12,7 @@ import { cyberTheme } from '@/lib/cyber/theme';
 import { useDynamicWallet } from '@/hooks/useDynamicWallet';
 import { useLineraGame } from '@/hooks/useLineraGame';
 import { useGameStore } from '@/stores/gameStore';
+import { useMultiplayerContext } from '@/contexts/MultiplayerContext';
 import { generateGameId } from '@/lib/cyber/gameId';
 import { Modal } from '../ui/Modal';
 import { CyberButton } from '../ui/CyberButton';
@@ -31,6 +32,15 @@ export function CreateGameModal({ isOpen, onClose }: CreateGameModalProps) {
   const { address, shortAddress } = useDynamicWallet();
   const { createGame, isLoading } = useLineraGame();
   const createMultiplayerGame = useGameStore((s) => s.createMultiplayerGame);
+  const { createBlockchainGame, connectLinera, lineraState } = useMultiplayerContext();
+
+  // Debug: Log Linera state
+  console.log('[CreateGameModal] Linera state:', {
+    isConnected: lineraState.isConnected,
+    isConnecting: lineraState.isConnecting,
+    owner: lineraState.owner,
+    error: lineraState.error,
+  });
 
   // Generate stable playerId once per modal instance - will be stored in game store
   // Append "-creator" to distinguish from joiner even if same wallet is used (testing on same machine)
@@ -50,6 +60,22 @@ export function CreateGameModal({ isOpen, onClose }: CreateGameModalProps) {
       // Create game on Linera blockchain - returns actual gameId
       // Using "0" stake for now - can be made configurable later
       const actualGameId = await createGame('0', roomCode);
+
+      // Record on real blockchain (fire-and-forget - don't block UI)
+      // Try to connect Linera first if not connected, then record the game
+      (async () => {
+        try {
+          if (!lineraState.isConnected) {
+            console.log('[CreateGameModal] Linera not connected, attempting to connect...');
+            await connectLinera();
+          }
+          console.log('[CreateGameModal] Recording game on blockchain:', roomCode);
+          await createBlockchainGame(roomCode);
+          console.log('[CreateGameModal] Blockchain recording successful');
+        } catch (err) {
+          console.warn('[CreateGameModal] Blockchain recording failed:', err);
+        }
+      })();
 
       // Display the roomCode to user (more friendly than numeric ID)
       setGameId(roomCode);

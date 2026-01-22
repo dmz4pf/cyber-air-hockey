@@ -6,9 +6,12 @@
  * This context maintains a single WebSocket connection that persists across
  * screen transitions (waiting -> ready -> playing), preventing connection
  * drops when components unmount/remount.
+ *
+ * Also manages Linera blockchain connection for game state persistence.
  */
 
 import React, { createContext, useContext, useRef, useState, useCallback, useEffect } from 'react';
+import type { LineraClient, WalletState } from '@/lib/linera/types';
 
 // Server message types
 interface ServerGameState {
@@ -52,6 +55,17 @@ interface OpponentExitedState {
   hasExited: boolean;
 }
 
+// Linera blockchain state
+interface LineraState {
+  client: LineraClient | null;
+  walletState: WalletState | null;
+  owner: string | null;
+  chainId: string | null;
+  isConnected: boolean;
+  isConnecting: boolean;
+  error: string | null;
+}
+
 type ServerMessage =
   | { type: 'room-joined'; gameId: string; playerNumber: 1 | 2 }
   | { type: 'opponent-joined'; opponentId: string }
@@ -93,7 +107,10 @@ interface MultiplayerContextValue {
   rematchState: RematchState;
   opponentExited: OpponentExitedState;
 
-  // Actions
+  // Linera blockchain state
+  lineraState: LineraState;
+
+  // WebSocket Actions
   connect: (gameId: string, playerId: string) => void;
   disconnect: () => void;
   sendPaddleMove: (x: number, y: number) => void;
@@ -103,6 +120,13 @@ interface MultiplayerContextValue {
   sendRematchRequest: () => void;
   sendRematchResponse: (accepted: boolean) => void;
   sendPlayerExit: () => void;
+
+  // Linera Actions
+  connectLinera: () => Promise<string>;
+  disconnectLinera: () => void;
+  createBlockchainGame: (roomCode: string) => Promise<number>;
+  joinBlockchainGame: (gameId: number) => Promise<void>;
+  submitBlockchainResult: (gameId: number, player1Score: number, player2Score: number) => Promise<void>;
 }
 
 const MultiplayerContext = createContext<MultiplayerContextValue | null>(null);
@@ -156,6 +180,18 @@ export function MultiplayerProvider({ children }: { children: React.ReactNode })
   const [opponentExited, setOpponentExited] = useState<OpponentExitedState>({
     hasExited: false,
   });
+
+  // Linera blockchain state
+  const [lineraState, setLineraState] = useState<LineraState>({
+    client: null,
+    walletState: null,
+    owner: null,
+    chainId: null,
+    isConnected: false,
+    isConnecting: false,
+    error: null,
+  });
+  const lineraClientRef = useRef<LineraClient | null>(null);
 
   // Refs
   const wsRef = useRef<WebSocket | null>(null);
@@ -329,6 +365,124 @@ export function MultiplayerProvider({ children }: { children: React.ReactNode })
     sendMessage({ type: 'player-exit' });
   }, [sendMessage]);
 
+  // ============================================
+  // Linera Blockchain Actions
+  // ============================================
+
+  // Connect to Linera (MetaMask + WASM client)
+  const connectLinera = useCallback(async (): Promise<string> => {
+    // Already connected?
+    if (lineraState.isConnected && lineraState.owner) {
+      return lineraState.owner;
+    }
+
+    setLineraState(prev => ({ ...prev, isConnecting: true, error: null }));
+
+    try {
+      // Dynamic import to avoid SSR issues
+      const { getLineraClientAsync } = await import('@/lib/linera');
+      const client = await getLineraClientAsync();
+      lineraClientRef.current = client;
+
+      const owner = await client.connect();
+      const walletState = client.getWalletState();
+
+      setLineraState({
+        client,
+        walletState,
+        owner,
+        chainId: walletState.chainId,
+        isConnected: true,
+        isConnecting: false,
+        error: null,
+      });
+
+      // Subscribe to wallet state changes
+      client.onWalletStateChange((newState) => {
+        setLineraState(prev => ({
+          ...prev,
+          walletState: newState,
+          chainId: newState.chainId,
+        }));
+      });
+
+      console.log('[MultiplayerContext] Linera connected:', owner);
+      return owner;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Linera connection failed';
+      setLineraState(prev => ({
+        ...prev,
+        isConnecting: false,
+        error: errorMessage,
+      }));
+      throw error;
+    }
+  }, [lineraState.isConnected, lineraState.owner]);
+
+  // Disconnect from Linera
+  const disconnectLinera = useCallback(() => {
+    if (lineraClientRef.current) {
+      lineraClientRef.current.disconnect();
+      lineraClientRef.current = null;
+    }
+    setLineraState({
+      client: null,
+      walletState: null,
+      owner: null,
+      chainId: null,
+      isConnected: false,
+      isConnecting: false,
+      error: null,
+    });
+    console.log('[MultiplayerContext] Linera disconnected');
+  }, []);
+
+  // Create game on blockchain
+  const createBlockchainGame = useCallback(async (roomCode: string): Promise<number> => {
+    const client = lineraClientRef.current;
+    if (!client) {
+      throw new Error('Linera not connected');
+    }
+
+    console.log('[MultiplayerContext] Creating blockchain game:', roomCode);
+    const result = await client.createGame({ stake: BigInt(0), roomCode });
+    console.log('[MultiplayerContext] Blockchain game created:', result.gameId);
+    return result.gameId;
+  }, []);
+
+  // Join game on blockchain
+  const joinBlockchainGame = useCallback(async (gameId: number): Promise<void> => {
+    const client = lineraClientRef.current;
+    if (!client) {
+      throw new Error('Linera not connected');
+    }
+
+    console.log('[MultiplayerContext] Joining blockchain game:', gameId);
+    await client.joinGame({ gameId });
+    console.log('[MultiplayerContext] Joined blockchain game:', gameId);
+  }, []);
+
+  // Submit result to blockchain
+  const submitBlockchainResult = useCallback(async (
+    gameId: number,
+    player1Score: number,
+    player2Score: number
+  ): Promise<void> => {
+    const client = lineraClientRef.current;
+    if (!client) {
+      throw new Error('Linera not connected');
+    }
+
+    console.log('[MultiplayerContext] Submitting blockchain result:', { gameId, player1Score, player2Score });
+    await client.submitResult({
+      gameId,
+      player1Score,
+      player2Score,
+      signature: '', // Server attestation or player signature
+    });
+    console.log('[MultiplayerContext] Blockchain result submitted');
+  }, []);
+
   // Connect to game
   const connect = useCallback((gameId: string, playerId: string) => {
     // If already connected to this game, don't reconnect
@@ -439,6 +593,22 @@ export function MultiplayerProvider({ children }: { children: React.ReactNode })
               setGameStatus('ended');
               gameStatusRef.current = 'ended';
               setGameState((prev) => prev ? { ...prev, score: message.finalScore } : null);
+
+              // Record result on blockchain (fire-and-forget - don't block UI)
+              // Note: Using 0 as placeholder gameId - real implementation should track blockchain gameId
+              if (lineraClientRef.current) {
+                const p1Score = message.finalScore.player1;
+                const p2Score = message.finalScore.player2;
+                console.log('[MultiplayerContext] Submitting blockchain result:', { p1Score, p2Score });
+                lineraClientRef.current.submitResult({
+                  gameId: 0, // TODO: Track actual blockchain gameId from createBlockchainGame
+                  player1Score: p1Score,
+                  player2Score: p2Score,
+                  signature: '',
+                }).catch((err: Error) => {
+                  console.warn('[MultiplayerContext] Blockchain result submission failed:', err);
+                });
+              }
               break;
 
             case 'error':
@@ -599,19 +769,26 @@ export function MultiplayerProvider({ children }: { children: React.ReactNode })
   }, [cleanup]);
 
   const value: MultiplayerContextValue = {
+    // Connection state
     isConnected,
     isConnecting,
     connectionError,
+    // Game state
     gameState,
     playerNumber,
     opponentJoined,
     countdown,
     gameStatus,
     winner,
+    // Pause state
     pauseState,
     opponentQuit,
+    // Rematch state
     rematchState,
     opponentExited,
+    // Linera blockchain state
+    lineraState,
+    // WebSocket Actions
     connect,
     disconnect,
     sendPaddleMove,
@@ -621,6 +798,12 @@ export function MultiplayerProvider({ children }: { children: React.ReactNode })
     sendRematchRequest,
     sendRematchResponse,
     sendPlayerExit,
+    // Linera Actions
+    connectLinera,
+    disconnectLinera,
+    createBlockchainGame,
+    joinBlockchainGame,
+    submitBlockchainResult,
   };
 
   return (

@@ -3,17 +3,30 @@
 /**
  * useLineraGame Hook
  *
- * A simplified React hook for game components that need to interact with the Linera blockchain.
+ * A React hook for game components that need to interact with games.
+ * Uses the backend REST API for game operations (cross-browser compatible).
  */
 
-import { useCallback, useState } from 'react';
-import { useLinera, type Game } from '@/providers/LineraDirectProvider';
+import { useCallback, useState, useEffect } from 'react';
+import { useAccount } from 'wagmi';
+import { lineraAPI, Game as APIGame } from '@/lib/api/linera-api';
 
 // ============================================================================
 // Types
 // ============================================================================
 
-export type { Game };
+export interface Game {
+  id: string;
+  roomCode: string;
+  creator: string;
+  opponent?: string | null;
+  stake: string;
+  status: 'waiting' | 'active' | 'completed' | 'cancelled';
+  player1Score?: number;
+  player2Score?: number;
+  winner?: string | null;
+  createdAt: number | string;
+}
 
 export interface CreateGameParams {
   stake: string;
@@ -52,113 +65,197 @@ export interface UseLineraGameReturn {
 }
 
 // ============================================================================
+// Helper to convert API Game to local Game type
+// ============================================================================
+
+function toGame(apiGame: APIGame): Game {
+  return {
+    id: apiGame.id,
+    roomCode: apiGame.roomCode,
+    creator: apiGame.creator,
+    opponent: apiGame.opponent,
+    stake: apiGame.stake,
+    status: apiGame.status,
+    player1Score: apiGame.player1Score,
+    player2Score: apiGame.player2Score,
+    winner: apiGame.winner,
+    createdAt: apiGame.createdAt,
+  };
+}
+
+// ============================================================================
 // Hook Implementation
 // ============================================================================
 
 export function useLineraGame(): UseLineraGameReturn {
-  const [operationLoading, setOperationLoading] = useState(false);
-  const context = useLinera();
+  const [isLoading, setIsLoading] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [isServerReady, setIsServerReady] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const { address, isConnected } = useAccount();
 
-  const {
-    isInitialized,
-    isConnected,
-    isConnecting,
-    error: contextError,
-    clearError: contextClearError,
-    createWallet,
-    createGame: contextCreateGame,
-    joinGame: contextJoinGame,
-    submitResult: contextSubmitResult,
-    cancelGame: contextCancelGame,
-    getOpenGames: contextGetOpenGames,
-    getMyGames: contextGetMyGames,
-    getGame: contextGetGame,
-  } = context;
+  // Check server health on mount
+  useEffect(() => {
+    const checkServer = async () => {
+      try {
+        const health = await lineraAPI.health();
+        if (health.status === 'healthy') {
+          setIsServerReady(true);
+        }
+      } catch (err) {
+        console.warn('[useLineraGame] Server not available:', err);
+        setIsServerReady(false);
+      }
+    };
 
-  // Computed state - map to legacy interface names
+    checkServer();
+    // Re-check every 10 seconds
+    const interval = setInterval(checkServer, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // State derived from wallet connection and server status
   const isAuthenticated = isConnected;
-  const isLineraConnected = isConnected && isInitialized;
-  const isApplicationReady = isInitialized;
-  const isReady = isConnected && isInitialized;
-  const isLoading = isConnecting || operationLoading || !isInitialized;
+  const isLineraConnected = isConnected && isServerReady;
+  const isReady = isServerReady;
 
-  // Wrapped Operations with Loading State
+  // Create a new game
   const createGame = useCallback(async (stake: string, roomCode: string): Promise<string> => {
-    setOperationLoading(true);
-    try {
-      const gameId = await contextCreateGame(stake, roomCode);
-      return gameId;
-    } finally {
-      setOperationLoading(false);
-    }
-  }, [contextCreateGame]);
+    setIsLoading(true);
+    setError(null);
 
+    try {
+      console.log('[useLineraGame] Creating game with roomCode:', roomCode);
+      const result = await lineraAPI.createGame(stake, roomCode);
+      console.log('[useLineraGame] Created game:', result.gameId);
+      return result.gameId;
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Failed to create game');
+      setError(error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Join an existing game
   const joinGame = useCallback(async (gameIdOrRoomCode: string): Promise<{ gameId: string; game: Game }> => {
-    setOperationLoading(true);
-    try {
-      return await contextJoinGame(gameIdOrRoomCode);
-    } finally {
-      setOperationLoading(false);
-    }
-  }, [contextJoinGame]);
+    setIsLoading(true);
+    setError(null);
 
+    try {
+      console.log('[useLineraGame] Joining game:', gameIdOrRoomCode);
+      const result = await lineraAPI.joinGame(gameIdOrRoomCode);
+      console.log('[useLineraGame] Joined game:', result.gameId);
+      return { gameId: result.gameId, game: toGame(result.game) };
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Failed to join game');
+      setError(error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Submit game result
   const submitResult = useCallback(async (
     gameId: string,
     player1Score: number,
     player2Score: number
   ): Promise<void> => {
-    setOperationLoading(true);
-    try {
-      await contextSubmitResult(gameId, player1Score, player2Score);
-    } finally {
-      setOperationLoading(false);
-    }
-  }, [contextSubmitResult]);
+    setIsLoading(true);
+    setError(null);
 
+    try {
+      console.log('[useLineraGame] Submitting result:', { gameId, player1Score, player2Score });
+      await lineraAPI.submitResult(gameId, player1Score, player2Score);
+      console.log('[useLineraGame] Result submitted');
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Failed to submit result');
+      setError(error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Cancel a game
   const cancelGame = useCallback(async (gameId: string): Promise<void> => {
-    setOperationLoading(true);
-    try {
-      await contextCancelGame(gameId);
-    } finally {
-      setOperationLoading(false);
-    }
-  }, [contextCancelGame]);
+    setIsLoading(true);
+    setError(null);
 
+    try {
+      console.log('[useLineraGame] Cancelling game:', gameId);
+      await lineraAPI.cancelGame(gameId);
+      console.log('[useLineraGame] Game cancelled');
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Failed to cancel game');
+      setError(error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Get open games
   const getOpenGames = useCallback(async (): Promise<Game[]> => {
-    setOperationLoading(true);
+    setIsLoading(true);
     try {
-      return await contextGetOpenGames();
+      const games = await lineraAPI.getOpenGames();
+      return games.map(toGame);
+    } catch (err) {
+      console.error('[useLineraGame] Failed to get open games:', err);
+      return [];
     } finally {
-      setOperationLoading(false);
+      setIsLoading(false);
     }
-  }, [contextGetOpenGames]);
+  }, []);
 
+  // Get my games (not implemented on backend yet)
   const getMyGames = useCallback(async (): Promise<Game[]> => {
-    setOperationLoading(true);
-    try {
-      return await contextGetMyGames();
-    } finally {
-      setOperationLoading(false);
-    }
-  }, [contextGetMyGames]);
+    console.log('[useLineraGame] getMyGames not yet implemented on backend');
+    return [];
+  }, []);
 
+  // Get a specific game
   const getGame = useCallback(async (gameId: string): Promise<Game | null> => {
-    setOperationLoading(true);
+    setIsLoading(true);
     try {
-      return await contextGetGame(gameId);
+      const game = await lineraAPI.getGame(gameId);
+      return game ? toGame(game) : null;
+    } catch (err) {
+      console.error('[useLineraGame] Failed to get game:', err);
+      return null;
     } finally {
-      setOperationLoading(false);
+      setIsLoading(false);
     }
-  }, [contextGetGame]);
+  }, []);
 
-  // Connect now calls createWallet from the new provider
+  // Connect to server
   const connect = useCallback(async (): Promise<void> => {
-    await createWallet();
-  }, [createWallet]);
+    setIsConnecting(true);
+    setError(null);
 
+    try {
+      const health = await lineraAPI.health();
+      if (health.status === 'healthy') {
+        setIsServerReady(true);
+      } else {
+        throw new Error('Server is not healthy');
+      }
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Failed to connect to server');
+      setError(error);
+      throw error;
+    } finally {
+      setIsConnecting(false);
+    }
+  }, []);
+
+  // Clear error
   const clearError = useCallback(() => {
-    contextClearError();
-  }, [contextClearError]);
+    setError(null);
+  }, []);
 
   return {
     // State
@@ -167,7 +264,7 @@ export function useLineraGame(): UseLineraGameReturn {
     isConnecting,
     isAuthenticated,
     isLineraConnected,
-    error: contextError,
+    error,
 
     // Game Operations
     createGame,

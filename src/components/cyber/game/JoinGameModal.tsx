@@ -51,7 +51,17 @@ export function JoinGameModal({ isOpen, onClose }: JoinGameModalProps) {
     opponentJoined,
     connect,
     disconnect,
+    joinBlockchainGame,
+    connectLinera,
+    lineraState,
   } = useMultiplayerContext();
+
+  // Debug: Log Linera state
+  console.log('[JoinGameModal] Linera state:', {
+    isConnected: lineraState.isConnected,
+    isConnecting: lineraState.isConnecting,
+    owner: lineraState.owner,
+  });
 
   // Connect when shouldConnect becomes true
   useEffect(() => {
@@ -111,7 +121,10 @@ export function JoinGameModal({ isOpen, onClose }: JoinGameModalProps) {
   };
 
   const handleJoinGame = async () => {
-    if (!address) return;
+    if (!address) {
+      setError('Please connect your wallet first');
+      return;
+    }
 
     setState('validating');
     setError(null);
@@ -133,6 +146,26 @@ export function JoinGameModal({ isOpen, onClose }: JoinGameModalProps) {
       // Store both the actual gameId and the roomCode
       setActualGameId(result.gameId);
       setRoomCode(result.game.roomCode || normalizedId);
+
+      // Record on real blockchain (fire-and-forget - don't block UI)
+      // Try to connect Linera first if not connected, then record the join
+      (async () => {
+        try {
+          if (!lineraState.isConnected) {
+            console.log('[JoinGameModal] Linera not connected, attempting to connect...');
+            await connectLinera();
+          }
+          // Try to parse gameId as number for blockchain, fallback to 0
+          const blockchainGameId = parseInt(result.gameId, 10) || 0;
+          console.log('[JoinGameModal] Recording join on blockchain, gameId:', blockchainGameId);
+          if (blockchainGameId > 0) {
+            await joinBlockchainGame(blockchainGameId);
+            console.log('[JoinGameModal] Blockchain recording successful');
+          }
+        } catch (err) {
+          console.warn('[JoinGameModal] Blockchain recording failed:', err);
+        }
+      })();
 
       // Start WebSocket connection
       setState('connecting');

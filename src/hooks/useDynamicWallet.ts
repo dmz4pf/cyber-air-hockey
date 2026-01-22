@@ -3,15 +3,15 @@
 /**
  * useDynamicWallet Hook
  *
- * A focused React hook for wallet UI components.
- * Provides only wallet-related state and actions, hiding game and Linera specifics.
+ * A React hook for wallet UI components using wagmi/RainbowKit.
+ * Provides wallet-related state and actions.
  *
- * Note: This hook maintains backward compatibility by wrapping the new LineraDirectProvider.
- * The "Dynamic" in the name is historical - it no longer uses Dynamic Labs.
+ * Note: The "Dynamic" in the name is historical - it no longer uses Dynamic Labs.
  */
 
 import { useCallback, useMemo } from 'react';
-import { useLinera } from '@/providers/LineraDirectProvider';
+import { useAccount, useBalance, useDisconnect } from 'wagmi';
+import { useConnectModal } from '@rainbow-me/rainbowkit';
 import type { StakeAmount } from '@/lib/linera/types';
 
 // ============================================================================
@@ -43,14 +43,14 @@ export interface UseDynamicWalletReturn {
   balance: StakeAmount | null;
   formattedBalance: string | null;
 
-  // Linera Status
+  // Linera Status (compatibility - uses RainbowKit connection for now)
   isLineraConnected: boolean;
   chainId: string | null;
   isApplicationReady: boolean;
   isMockMode: boolean;
 
   // Actions
-  connect: () => Promise<void>;
+  connect: () => void;
   disconnect: () => void;
 
   // Error Handling
@@ -75,20 +75,11 @@ function shortenAddress(address: string): string {
 // ============================================================================
 
 export function useDynamicWallet(): UseDynamicWalletReturn {
-  const context = useLinera();
-
-  const {
-    isInitialized,
-    isConnected,
-    isConnecting,
-    walletAddress,
-    chainId,
-    balanceFormatted,
-    createWallet,
-    disconnect: contextDisconnect,
-    error,
-    clearError: contextClearError,
-  } = context;
+  // Wagmi hooks
+  const { address, isConnected, isConnecting, chain } = useAccount();
+  const { data: balanceData } = useBalance({ address });
+  const { disconnect: wagmiDisconnect } = useDisconnect();
+  const { openConnectModal } = useConnectModal();
 
   // Compute connection status
   const status = useMemo<WalletConnectionStatus>(() => {
@@ -99,27 +90,19 @@ export function useDynamicWallet(): UseDynamicWalletReturn {
 
   // Compute short address
   const shortAddress = useMemo(() => {
-    if (!walletAddress) return null;
-    return shortenAddress(walletAddress);
-  }, [walletAddress]);
+    if (!address) return null;
+    return shortenAddress(address);
+  }, [address]);
 
   // Convert balance to StakeAmount format
   const balance = useMemo<StakeAmount | null>(() => {
-    if (!balanceFormatted) return null;
-    // Parse the string value to bigint (handle decimal values by multiplying)
-    let bigintValue: bigint;
-    try {
-      // Try to parse as a simple integer first
-      bigintValue = BigInt(balanceFormatted.value.replace(/[^0-9]/g, '') || '0');
-    } catch {
-      bigintValue = BigInt(0);
-    }
+    if (!balanceData) return null;
     return {
-      value: balanceFormatted.value,
-      bigint: bigintValue,
-      formatted: balanceFormatted.formatted,
+      value: balanceData.value.toString(),
+      bigint: balanceData.value,
+      formatted: `${parseFloat(balanceData.formatted).toFixed(4)} ${balanceData.symbol}`,
     };
-  }, [balanceFormatted]);
+  }, [balanceData]);
 
   // Formatted balance string
   const formattedBalance = useMemo(() => {
@@ -127,20 +110,20 @@ export function useDynamicWallet(): UseDynamicWalletReturn {
     return balance.formatted;
   }, [balance]);
 
-  // Connect action - calls createWallet from the new provider
-  const connect = useCallback(async () => {
-    await createWallet();
-  }, [createWallet]);
+  // Connect action - opens RainbowKit modal
+  const connect = useCallback(() => {
+    openConnectModal?.();
+  }, [openConnectModal]);
 
   // Disconnect action
   const disconnect = useCallback(() => {
-    contextDisconnect();
-  }, [contextDisconnect]);
+    wagmiDisconnect();
+  }, [wagmiDisconnect]);
 
-  // Clear error action
+  // Clear error action (no-op for now)
   const clearError = useCallback(() => {
-    contextClearError();
-  }, [contextClearError]);
+    // RainbowKit handles errors internally
+  }, []);
 
   return {
     // Connection State
@@ -149,25 +132,25 @@ export function useDynamicWallet(): UseDynamicWalletReturn {
     status,
 
     // Address Info
-    address: walletAddress,
+    address: address ?? null,
     shortAddress,
 
     // Balance Info
     balance,
     formattedBalance,
 
-    // Linera Status (mapped from new interface)
-    isLineraConnected: isConnected && isInitialized,
-    chainId,
-    isApplicationReady: isInitialized,
-    isMockMode: false, // No longer using mock mode
+    // Linera Status (mapped from wagmi)
+    isLineraConnected: isConnected,
+    chainId: chain?.id?.toString() ?? null,
+    isApplicationReady: true, // Always ready with RainbowKit
+    isMockMode: false,
 
     // Actions
     connect,
     disconnect,
 
     // Error Handling
-    error,
+    error: null, // RainbowKit handles errors
     clearError,
   };
 }

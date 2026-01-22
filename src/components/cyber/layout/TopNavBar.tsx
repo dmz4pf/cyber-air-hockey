@@ -1,17 +1,16 @@
 'use client';
 
 /**
- * TopNavBar - Theme-aware navigation bar
+ * TopNavBar - Theme-aware navigation bar with RainbowKit wallet connection
  */
 
 import React, { useState } from 'react';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useThemedStyles } from '@/lib/cyber/useThemedStyles';
 import { usePlayerStore } from '@/stores/playerStore';
-import { useLinera } from '@/providers/LineraDirectProvider';
 import { Logo } from './Logo';
 import { NavLinks } from './NavLinks';
 import { RankBadge } from '../ui/RankBadge';
-import { WalletButton } from '../ui/WalletButton';
 
 interface TopNavBarProps {
   className?: string;
@@ -21,23 +20,6 @@ export function TopNavBar({ className = '' }: TopNavBarProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const profile = usePlayerStore((state) => state.profile);
   const theme = useThemedStyles();
-
-  // Wallet state from useLinera
-  const {
-    isConnected,
-    isConnecting,
-    walletAddress,
-    balanceFormatted,
-    connect,
-    disconnect,
-  } = useLinera();
-
-  // Derive address display values
-  const address = walletAddress;
-  const shortAddress = walletAddress
-    ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
-    : null;
-  const balance = balanceFormatted?.formatted || null;
 
   return (
     <header
@@ -57,17 +39,115 @@ export function TopNavBar({ className = '' }: TopNavBarProps) {
           <div className="hidden md:flex items-center gap-6">
             <NavLinks />
 
-            {/* Wallet Connection */}
-            <WalletButton
-              isConnected={isConnected}
-              isConnecting={isConnecting}
-              address={address}
-              shortAddress={shortAddress}
-              balance={balance}
-              onConnect={connect}
-              onDisconnect={disconnect}
-              variant="compact"
-            />
+            {/* RainbowKit Wallet Connection */}
+            <ConnectButton.Custom>
+              {({
+                account,
+                chain,
+                openAccountModal,
+                openChainModal,
+                openConnectModal,
+                authenticationStatus,
+                mounted,
+              }) => {
+                const ready = mounted && authenticationStatus !== 'loading';
+                const connected =
+                  ready &&
+                  account &&
+                  chain &&
+                  (!authenticationStatus || authenticationStatus === 'authenticated');
+
+                return (
+                  <div
+                    {...(!ready && {
+                      'aria-hidden': true,
+                      style: {
+                        opacity: 0,
+                        pointerEvents: 'none',
+                        userSelect: 'none',
+                      },
+                    })}
+                  >
+                    {(() => {
+                      if (!connected) {
+                        return (
+                          <button
+                            onClick={openConnectModal}
+                            className="px-4 py-2 rounded-lg font-bold text-sm transition-all duration-200 hover:scale-105"
+                            style={{
+                              backgroundColor: theme.colors.primary,
+                              color: theme.colors.bg.primary,
+                              boxShadow: `0 0 20px ${theme.colors.primary}40`,
+                            }}
+                          >
+                            Connect
+                          </button>
+                        );
+                      }
+
+                      if (chain.unsupported) {
+                        return (
+                          <button
+                            onClick={openChainModal}
+                            className="px-4 py-2 rounded-lg font-bold text-sm"
+                            style={{
+                              backgroundColor: theme.colors.error,
+                              color: 'white',
+                            }}
+                          >
+                            Wrong network
+                          </button>
+                        );
+                      }
+
+                      return (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={openChainModal}
+                            className="flex items-center gap-1 px-2 py-1 rounded text-xs"
+                            style={{
+                              backgroundColor: theme.colors.bg.tertiary,
+                              color: theme.colors.text.secondary,
+                              border: `1px solid ${theme.colors.border.default}`,
+                            }}
+                          >
+                            {chain.hasIcon && chain.iconUrl && (
+                              <img
+                                alt={chain.name ?? 'Chain icon'}
+                                src={chain.iconUrl}
+                                className="w-4 h-4"
+                              />
+                            )}
+                            {chain.name}
+                          </button>
+
+                          <button
+                            onClick={openAccountModal}
+                            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-mono"
+                            style={{
+                              backgroundColor: theme.colors.bg.tertiary,
+                              color: theme.colors.success,
+                              border: `1px solid ${theme.colors.border.default}`,
+                            }}
+                          >
+                            <span
+                              className="w-2 h-2 rounded-full animate-pulse"
+                              style={{ backgroundColor: theme.colors.success }}
+                            />
+                            {account.displayName}
+                            {account.displayBalance && (
+                              <span style={{ color: theme.colors.warning }}>
+                                {account.displayBalance}
+                              </span>
+                            )}
+                          </button>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                );
+              }}
+            </ConnectButton.Custom>
 
             {/* Profile mini */}
             {profile && (
@@ -133,21 +213,12 @@ export function TopNavBar({ className = '' }: TopNavBarProps) {
           >
             <NavLinks direction="vertical" />
 
-            {/* Wallet Connection (mobile) */}
+            {/* RainbowKit Wallet Connection (mobile) */}
             <div
               className="mt-4 pt-4 border-t"
               style={{ borderColor: theme.colors.border.subtle }}
             >
-              <WalletButton
-                isConnected={isConnected}
-                isConnecting={isConnecting}
-                address={address}
-                shortAddress={shortAddress}
-                balance={balance}
-                onConnect={connect}
-                onDisconnect={disconnect}
-                variant="full"
-              />
+              <ConnectButton />
             </div>
 
             {/* Profile mini (mobile) */}
