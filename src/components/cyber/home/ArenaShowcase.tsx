@@ -34,7 +34,10 @@ export function ArenaShowcase() {
   }, []);
 
   return (
-    <section className="relative px-4 py-32">
+    <section
+      className="relative px-4 py-32"
+      style={{ backgroundColor: cyberTheme.colors.bg.primary }}
+    >
       <div className="max-w-6xl mx-auto">
         {/* Title - Flies in first */}
         <motion.h2
@@ -77,7 +80,7 @@ export function ArenaShowcase() {
           }}
           initial={{ opacity: 0, y: 50 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: false, amount: 0.3 }}
+          viewport={{ once: false, amount: 0.2 }}
           transition={{ duration: 0.8, delay: 0.4 }}
         >
           <div
@@ -207,7 +210,6 @@ export function ArenaShowcase() {
               }
             )}
 
-
             {/* Grid overlay */}
             <div
               className="absolute inset-0 pointer-events-none opacity-10"
@@ -284,102 +286,162 @@ export function ArenaShowcase() {
   );
 }
 
-// Animated Match Component - Realistic air hockey simulation
+// Animated Match Component - Paddles make contact with puck
 const AnimatedMatch = () => {
   const puckRef = useRef<HTMLDivElement>(null);
   const leftPaddleRef = useRef<HTMLDivElement>(null);
   const rightPaddleRef = useRef<HTMLDivElement>(null);
-  const timelineRef = useRef<gsap.core.Timeline | null>(null);
 
   useEffect(() => {
     if (!puckRef.current || !leftPaddleRef.current || !rightPaddleRef.current) return;
 
-    // Create the match timeline
+    // Create the match timeline - paddles drive puck movement
     const tl = gsap.timeline({
       repeat: -1,
-      repeatDelay: 0.3,
+      repeatDelay: 0.8,
     });
 
-    // Match sequence: 2-3 second realistic rally
+    // All positions are in percentages - paddles are 36px, puck is 22px
+    // Paddle radius ~18px, puck radius ~11px, so contact at ~29px offset in %
+
     tl
-      // Starting position - puck at center, paddles ready
-      .set(puckRef.current, { x: '50%', y: '50%', xPercent: -50, yPercent: -50 })
-      .set(leftPaddleRef.current, { x: '25%', y: '50%', xPercent: -50, yPercent: -50 })
-      .set(rightPaddleRef.current, { x: '75%', y: '50%', xPercent: -50, yPercent: -50 })
+      // === INITIAL SETUP ===
+      .set(puckRef.current, { left: '50%', top: '50%' })
+      .set(leftPaddleRef.current, { left: '25%', top: '50%' })
+      .set(rightPaddleRef.current, { left: '75%', top: '50%' })
 
-      // Rally 1: Left paddle hits to right
+      // === RALLY 1: Left paddle approaches and hits puck ===
+      // Left paddle moves TO the puck position
       .to(leftPaddleRef.current, {
-        y: '45%',
-        duration: 0.15,
-        ease: 'power2.out'
-      }, 0.1)
-      .to(puckRef.current, {
-        x: '70%',
-        y: '45%',
-        duration: 0.4,
-        ease: 'power1.inOut'
-      }, 0.15)
-
-      // Rally 2: Right paddle returns
-      .to(rightPaddleRef.current, {
-        y: '40%',
-        duration: 0.15,
-        ease: 'power2.out'
-      }, 0.45)
-      .to(puckRef.current, {
-        x: '35%',
-        y: '60%',
-        duration: 0.45,
-        ease: 'power1.inOut'
-      }, 0.5)
-
-      // Rally 3: Left paddle repositions and hits
-      .to(leftPaddleRef.current, {
-        y: '62%',
-        duration: 0.2,
-        ease: 'power2.out'
-      }, 0.85)
-      .to(puckRef.current, {
-        x: '72%',
-        y: '55%',
-        duration: 0.4,
-        ease: 'power1.inOut'
-      }, 0.95)
-
-      // Rally 4: Right paddle final hit
-      .to(rightPaddleRef.current, {
-        y: '54%',
-        duration: 0.15,
-        ease: 'power2.out'
-      }, 1.25)
-      .to(puckRef.current, {
-        x: '30%',
-        y: '48%',
-        duration: 0.45,
-        ease: 'power1.inOut'
-      }, 1.3)
-
-      // Final shot: Left paddle winds up and shoots
-      .to(leftPaddleRef.current, {
-        y: '46%',
-        duration: 0.2,
-        ease: 'power2.inOut'
-      }, 1.65)
-      .to(puckRef.current, {
-        x: '95%',
-        y: '50%',
-        duration: 0.5,
+        left: '46%',  // Move close to puck at 50%
+        top: '50%',
+        duration: 0.3,
         ease: 'power2.in'
-      }, 1.75)
-
-      // Reset paddles to ready position
-      .to([leftPaddleRef.current, rightPaddleRef.current], {
-        y: '50%',
+      }, 0.2)
+      // Puck moves AFTER paddle contact
+      .to(puckRef.current, {
+        left: '72%',
+        top: '35%',
+        duration: 0.4,
+        ease: 'power2.out'
+      }, 0.5)
+      // Left paddle follows through slightly then retreats
+      .to(leftPaddleRef.current, {
+        left: '48%',
+        top: '48%',
+        duration: 0.1,
+        ease: 'power1.out'
+      }, 0.5)
+      .to(leftPaddleRef.current, {
+        left: '30%',
+        top: '45%',
         duration: 0.3,
         ease: 'power1.inOut'
-      }, 2.1);
+      }, 0.7)
 
-    timelineRef.current = tl;
+      // === RALLY 2: Right paddle intercepts ===
+      // Right paddle moves to where puck will be
+      .to(rightPaddleRef.current, {
+        left: '68%',
+        top: '35%',
+        duration: 0.35,
+        ease: 'power2.out'
+      }, 0.6)
+      // Puck bounces back after right paddle contact
+      .to(puckRef.current, {
+        left: '35%',
+        top: '60%',
+        duration: 0.45,
+        ease: 'power2.out'
+      }, 0.95)
+      // Right paddle follow through
+      .to(rightPaddleRef.current, {
+        left: '70%',
+        top: '40%',
+        duration: 0.2,
+        ease: 'power1.out'
+      }, 1.0)
+
+      // === RALLY 3: Left paddle defends and counters ===
+      // Left paddle moves down to intercept
+      .to(leftPaddleRef.current, {
+        left: '31%',
+        top: '60%',
+        duration: 0.3,
+        ease: 'power2.out'
+      }, 1.1)
+      // Puck bounces after contact
+      .to(puckRef.current, {
+        left: '65%',
+        top: '45%',
+        duration: 0.4,
+        ease: 'power2.out'
+      }, 1.45)
+      // Left paddle follow through
+      .to(leftPaddleRef.current, {
+        left: '38%',
+        top: '55%',
+        duration: 0.15,
+        ease: 'power1.out'
+      }, 1.45)
+
+      // === RALLY 4: Right paddle returns ===
+      .to(rightPaddleRef.current, {
+        left: '61%',
+        top: '45%',
+        duration: 0.25,
+        ease: 'power2.out'
+      }, 1.6)
+      .to(puckRef.current, {
+        left: '40%',
+        top: '50%',
+        duration: 0.4,
+        ease: 'power2.out'
+      }, 1.9)
+
+      // === FINAL: Left paddle SCORES! ===
+      // Left paddle winds up
+      .to(leftPaddleRef.current, {
+        left: '32%',
+        top: '50%',
+        duration: 0.2,
+        ease: 'power1.in'
+      }, 2.1)
+      // Left paddle strikes hard
+      .to(leftPaddleRef.current, {
+        left: '38%',
+        top: '50%',
+        duration: 0.1,
+        ease: 'power4.out'
+      }, 2.35)
+      // Puck rockets into goal!
+      .to(puckRef.current, {
+        left: '94%',
+        top: '50%',
+        duration: 0.35,
+        ease: 'power2.in'
+      }, 2.4)
+      // Right paddle tries to save but too late
+      .to(rightPaddleRef.current, {
+        left: '82%',
+        top: '50%',
+        duration: 0.25,
+        ease: 'power3.out'
+      }, 2.5)
+
+      // === RESET: Smooth transition back to start ===
+      .to([leftPaddleRef.current, rightPaddleRef.current], {
+        left: (i) => i === 0 ? '25%' : '75%',
+        top: '50%',
+        duration: 0.5,
+        ease: 'power1.inOut'
+      }, 3.0)
+      .to(puckRef.current, {
+        left: '50%',
+        top: '50%',
+        duration: 0.5,
+        ease: 'power1.inOut'
+      }, 3.0);
 
     return () => {
       tl.kill();
@@ -388,41 +450,43 @@ const AnimatedMatch = () => {
 
   return (
     <>
-      {/* Left Paddle - Player (Green/Cyan) */}
+      {/* Left Paddle - Player (Cyan) */}
       <div
         ref={leftPaddleRef}
         className="absolute"
         style={{
-          width: 32,
-          height: 32,
+          width: 36,
+          height: 36,
           borderRadius: '50%',
-          background: `radial-gradient(circle, ${colors.cyan}, ${colors.cyan}80)`,
+          background: `radial-gradient(circle at 30% 30%, ${colors.cyan}, ${colors.cyan}80)`,
           boxShadow: `
-            0 0 20px ${colors.cyan},
-            0 0 30px ${colors.cyan}80,
-            inset 0 0 10px ${colors.cyan}
+            0 0 15px ${colors.cyan},
+            0 0 25px ${colors.cyan}80,
+            inset 0 0 8px rgba(255,255,255,0.3)
           `,
           border: `2px solid ${colors.cyan}`,
-          zIndex: 2,
+          zIndex: 10,
+          transform: 'translate(-50%, -50%)',
         }}
       />
 
-      {/* Right Paddle - Opponent (Red/Amber) */}
+      {/* Right Paddle - Opponent (Amber/Red) */}
       <div
         ref={rightPaddleRef}
         className="absolute"
         style={{
-          width: 32,
-          height: 32,
+          width: 36,
+          height: 36,
           borderRadius: '50%',
-          background: `radial-gradient(circle, ${colors.amber}, #ef4444)`,
+          background: `radial-gradient(circle at 30% 30%, #ff6b6b, ${colors.amber})`,
           boxShadow: `
-            0 0 20px ${colors.amber},
-            0 0 30px ${colors.amber}80,
-            inset 0 0 10px ${colors.amber}
+            0 0 15px ${colors.amber},
+            0 0 25px ${colors.amber}80,
+            inset 0 0 8px rgba(255,255,255,0.3)
           `,
           border: `2px solid ${colors.amber}`,
-          zIndex: 2,
+          zIndex: 10,
+          transform: 'translate(-50%, -50%)',
         }}
       />
 
@@ -431,26 +495,27 @@ const AnimatedMatch = () => {
         ref={puckRef}
         className="absolute"
         style={{
-          width: 20,
-          height: 20,
+          width: 22,
+          height: 22,
           borderRadius: '50%',
-          background: `radial-gradient(circle, ${colors.white}, ${cyberTheme.colors.primary})`,
+          background: `radial-gradient(circle at 40% 40%, ${colors.white}, ${cyberTheme.colors.primary})`,
           boxShadow: `
-            0 0 20px ${cyberTheme.colors.primary},
-            0 0 40px ${cyberTheme.colors.primary}
+            0 0 15px ${cyberTheme.colors.primary},
+            0 0 30px ${cyberTheme.colors.primary}80
           `,
-          zIndex: 3,
+          zIndex: 11,
+          transform: 'translate(-50%, -50%)',
         }}
       >
-        {/* Puck trail effect */}
+        {/* Puck glow pulse */}
         <motion.div
           className="absolute inset-0 rounded-full"
           style={{
             background: `radial-gradient(circle, ${cyberTheme.colors.primary}60, transparent)`,
           }}
           animate={{
-            scale: [1, 2.5, 1],
-            opacity: [0.8, 0, 0.8],
+            scale: [1, 1.8, 1],
+            opacity: [0.6, 0, 0.6],
           }}
           transition={{
             duration: 0.6,
