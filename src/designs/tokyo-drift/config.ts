@@ -37,6 +37,17 @@ export const tokyoDriftConfig: DesignConfig = {
     // Goal zones: Glowing neon with transparency
     goalZone1: '#00f5ff40', // Bottom - cyan with 25% opacity
     goalZone2: '#ff006e40', // Top - pink with 25% opacity
+
+    // Extended colors for full app
+    primary: '#00f5ff',
+    secondary: '#ff006e',
+    success: '#00ff88',
+    warning: '#ffcc00',
+    error: '#ff3366',
+    navBackground: 'rgba(10, 3, 18, 0.95)',
+    cardBackground: '#1a0f2e',
+    buttonPrimary: '#00f5ff',
+    buttonSecondary: '#ff006e',
   },
   effects: {
     // Maximum glow for that neon street aesthetic
@@ -63,4 +74,6 @@ export const tokyoDriftConfig: DesignConfig = {
     // Sharp, technical score display - like racing timers
     score: "'Orbitron', 'Share Tech Mono', monospace",
   },
+  backgroundEffect: 'gradient',
+  backgroundGradient: 'radial-gradient(ellipse at top, #1a0f2e 0%, #0a0312 50%), radial-gradient(ellipse at bottom, #200f35 0%, #0a0312 70%)',
 };

@@ -485,12 +485,13 @@ export class LineraService extends EventEmitter {
   }
 
   /**
-   * Join an existing game
+   * Join an existing game by gameId or roomCode
+   * @param gameIdOrRoomCode - Either the numeric gameId or the roomCode (e.g., "GQED-DJNP")
    */
-  async joinGame(gameId: string): Promise<void> {
+  async joinGame(gameIdOrRoomCode: string): Promise<{ gameId: string; game: Game }> {
     // Mock mode
     if (this.mockMode) {
-      const game = this.mockGames.get(gameId);
+      const game = this.mockGames.get(gameIdOrRoomCode);
       if (!game) {
         throw new Error('Game not found');
       }
@@ -499,19 +500,40 @@ export class LineraService extends EventEmitter {
       }
       game.opponent = 'mock-opponent';
       game.status = 'active';
-      log.info(`[MOCK] Joined game: ${gameId}`);
-      return;
+      log.info(`[MOCK] Joined game: ${gameIdOrRoomCode}`);
+      return { gameId: game.id, game };
     }
 
     this.validateConfig();
+
+    // First, find the game by roomCode in open games
+    const openGames = await this.getOpenGames();
+    let actualGameId = gameIdOrRoomCode;
+    let foundGame = openGames.find(g => g.id === gameIdOrRoomCode);
+
+    // If not found by ID, try by roomCode
+    if (!foundGame) {
+      foundGame = openGames.find(g => g.roomCode === gameIdOrRoomCode);
+      if (foundGame) {
+        actualGameId = foundGame.id;
+        log.info(`Found game by roomCode ${gameIdOrRoomCode} -> gameId ${actualGameId}`);
+      }
+    }
+
+    if (!foundGame) {
+      throw new Error(`Game not found with ID or code: ${gameIdOrRoomCode}`);
+    }
 
     await this.query(`
       mutation JoinGame($gameId: String!) {
         joinGame(gameId: $gameId)
       }
-    `, { gameId });
+    `, { gameId: actualGameId });
 
-    log.info(`Joined game: ${gameId}`);
+    log.info(`Joined game: ${actualGameId}`);
+
+    // Return the actual gameId and game info
+    return { gameId: actualGameId, game: foundGame };
   }
 
   /**

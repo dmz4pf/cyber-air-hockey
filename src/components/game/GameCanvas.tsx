@@ -2,10 +2,21 @@
 
 import { useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { PHYSICS_CONFIG } from '@/lib/physics/config';
-import { GameBodies } from '@/lib/physics/engine';
+
+/**
+ * Minimal interface for bodies that can be rendered.
+ * This interface is satisfied by both:
+ * - Local physics engine (GameBodies from useGameEngine)
+ * - Server-authoritative state (MultiplayerBodies from useMultiplayerGameEngine)
+ */
+export interface RenderableBodies {
+  puck: { position: { x: number; y: number } };
+  paddle1: { position: { x: number; y: number } };
+  paddle2: { position: { x: number; y: number } };
+}
 
 interface GameCanvasProps {
-  getBodies: () => GameBodies | null;
+  getBodies: () => RenderableBodies | null;
 }
 
 export interface GameCanvasRef {

@@ -38,8 +38,19 @@ export const midnightClubConfig: DesignConfig = {
     // Goal zones: Subtle gold tints
     goalZone1: 'rgba(212, 175, 55, 0.08)',
     goalZone2: 'rgba(139, 40, 70, 0.08)',
+
+    // Extended colors for full app
+    primary: '#d4af37',
+    secondary: '#8b2846',
+    success: '#4ade80',
+    warning: '#ffd700',
+    error: '#ef4444',
+    navBackground: 'rgba(10, 10, 15, 0.98)',
+    cardBackground: '#1a1a26',
+    buttonPrimary: '#d4af37',
+    buttonSecondary: '#8b2846',
   },
-  
+
   effects: {
     // Subtle, sophisticated glow - no harsh effects (0-30 range)
     glowIntensity: 8,
@@ -60,4 +71,6 @@ export const midnightClubConfig: DesignConfig = {
     // Elegant display for scores
     score: "'Playfair Display', serif",
   },
+  backgroundEffect: 'gradient',
+  backgroundGradient: 'radial-gradient(ellipse at top, #1a1a26 0%, #0a0a0f 50%), radial-gradient(ellipse at bottom right, #14141c 0%, #0a0a0f 60%)',
 };

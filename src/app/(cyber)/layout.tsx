@@ -8,6 +8,7 @@
 import React from 'react';
 import { TopNavBar } from '@/components/cyber/layout';
 import { useThemeStore } from '@/stores/themeStore';
+import { MultiplayerProvider } from '@/contexts/MultiplayerContext';
 
 interface CyberLayoutProps {
   children: React.ReactNode;
@@ -29,7 +30,9 @@ export default function CyberLayout({ children }: CyberLayoutProps) {
 
       {/* Main content with top padding for fixed navbar */}
       <main className="pt-16">
-        {children}
+        <MultiplayerProvider>
+          {children}
+        </MultiplayerProvider>
       </main>
 
       {/* Scanline effect for retro theme only */}

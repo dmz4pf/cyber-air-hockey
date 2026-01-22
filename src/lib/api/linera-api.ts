@@ -48,6 +48,12 @@ export interface SuccessResponse {
   success: boolean;
 }
 
+export interface JoinGameResponse {
+  success: boolean;
+  gameId: string;
+  game: Game;
+}
+
 // =============================================================================
 // API Error
 // =============================================================================
@@ -199,11 +205,11 @@ class LineraAPI {
   }
 
   /**
-   * Join an existing game
+   * Join an existing game (accepts gameId or roomCode)
    */
-  async joinGame(gameId: string): Promise<SuccessResponse> {
-    return this.request<SuccessResponse>(
-      `/api/games/${encodeURIComponent(gameId)}/join`,
+  async joinGame(gameIdOrRoomCode: string): Promise<JoinGameResponse> {
+    return this.request<JoinGameResponse>(
+      `/api/games/${encodeURIComponent(gameIdOrRoomCode)}/join`,
       { method: 'POST' }
     );
   }

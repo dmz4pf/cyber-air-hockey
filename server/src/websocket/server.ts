@@ -1,7 +1,17 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server as HttpServer } from 'http';
 import { roomManager } from './room-manager';
-import { ClientMessage, isClientMessage, isJoinRoomMessage, isPaddleMoveMessage, isPlayerReadyMessage, isPingMessage } from './message-types';
+import {
+  ClientMessage,
+  isClientMessage,
+  isJoinRoomMessage,
+  isPaddleMoveMessage,
+  isPlayerReadyMessage,
+  isPingMessage,
+  isPauseRequestMessage,
+  isResumeRequestMessage,
+  isQuitGameMessage
+} from './message-types';
 import { GameServer } from '../services/game-server';
 
 export function setupWebSocketServer(httpServer: HttpServer, gameServer: GameServer): WebSocketServer {
@@ -93,6 +103,7 @@ export function setupWebSocketServer(httpServer: HttpServer, gameServer: GameSer
 
 function handleMessage(ws: WebSocket, message: ClientMessage, gameServer: GameServer): void {
   if (isJoinRoomMessage(message)) {
+    console.log(`[WebSocket] Join room request: gameId=${message.gameId}, playerId=${message.playerId}`);
     gameServer.handleJoinRoom(ws, message.gameId, message.playerId);
   } else if (isPaddleMoveMessage(message)) {
     gameServer.handlePaddleMove(ws, message.x, message.y);
@@ -107,12 +118,25 @@ function handleMessage(ws: WebSocket, message: ClientMessage, gameServer: GameSe
     } catch (error) {
       console.error('[WebSocket] Failed to send pong:', error);
     }
+  } else if (isPauseRequestMessage(message)) {
+    console.log('[WebSocket] Pause request received');
+    gameServer.handlePauseRequest(ws);
+  } else if (isResumeRequestMessage(message)) {
+    console.log('[WebSocket] Resume request received');
+    gameServer.handleResumeRequest(ws);
+  } else if (isQuitGameMessage(message)) {
+    console.log('[WebSocket] Quit game request received');
+    gameServer.handleQuitGame(ws);
   }
 }
 
 function handleDisconnect(ws: WebSocket, gameServer: GameServer): void {
   const roomInfo = roomManager.getRoomByWebSocket(ws);
   if (roomInfo) {
-    gameServer.handleDisconnect(roomInfo.gameId, roomInfo.playerId);
+    console.log(`[WebSocket] Player disconnected: gameId=${roomInfo.gameId}, playerId=${roomInfo.playerId}`);
+    // Pass the WebSocket to verify it's still the current one (not stale from reconnection)
+    gameServer.handleDisconnect(roomInfo.gameId, roomInfo.playerId, ws);
+  } else {
+    console.log('[WebSocket] Disconnect from untracked connection (no room joined)');
   }
 }

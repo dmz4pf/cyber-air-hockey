@@ -37,6 +37,17 @@ export const synthwaveSunsetConfig: DesignConfig = {
     // Goal zones: Subtle purple with pink/cyan tints
     goalZone1: 'rgba(255, 0, 110, 0.15)',
     goalZone2: 'rgba(0, 245, 255, 0.15)',
+
+    // Extended colors for full app
+    primary: '#ff006e',
+    secondary: '#00f5ff',
+    success: '#00ff99',
+    warning: '#ffb703',
+    error: '#ff3366',
+    navBackground: 'rgba(26, 10, 46, 0.98)',
+    cardBackground: '#2d1b4e',
+    buttonPrimary: '#ff006e',
+    buttonSecondary: '#00f5ff',
   },
   effects: {
     // High glow for that neon feel (0-30 range)
@@ -67,4 +78,6 @@ export const synthwaveSunsetConfig: DesignConfig = {
     // Bold digital score display
     score: "'Orbitron', monospace",
   },
+  backgroundEffect: 'gradient',
+  backgroundGradient: 'linear-gradient(to bottom, #1a0a2e 0%, #16213e 40%, #0f3460 70%, #ff006e20 100%)',
 };

@@ -11,8 +11,8 @@ interface ThemeStore {
 export const useThemeStore = create<ThemeStore>()(
   persist(
     (set) => ({
-      themeId: 'arcade',
-      theme: themes.arcade,
+      themeId: 'cyber',
+      theme: themes.cyber,
       setTheme: (id: ThemeId) =>
         set({
           themeId: id,

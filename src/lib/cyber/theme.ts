@@ -1,68 +1,67 @@
 /**
- * Air Hockey Design System Tokens
- * NO PURPLE - Using Electric Vibrant as default
+ * Cyber Esports Design System Tokens
  */
 
 export const cyberTheme = {
   colors: {
-    // Primary palette - Teal/Coral combo
-    primary: '#14B8A6', // Teal - main accent
-    secondary: '#FF6B6B', // Coral - secondary accent
+    // Primary palette
+    primary: '#8b5cf6', // Purple - main accent
+    secondary: '#6366f1', // Indigo - secondary accent
 
     // Backgrounds
     bg: {
-      primary: '#0A0F14', // Darkest
-      secondary: '#0F1419', // Dark
-      tertiary: '#151C24', // Slightly lighter
-      panel: 'rgba(20, 184, 166, 0.08)',
-      panelHover: 'rgba(20, 184, 166, 0.12)',
-      overlay: 'rgba(10, 15, 20, 0.95)',
+      primary: '#050510', // Darkest
+      secondary: '#0a0a20', // Dark
+      tertiary: '#111827', // Slightly lighter
+      panel: 'rgba(99, 102, 241, 0.1)',
+      panelHover: 'rgba(99, 102, 241, 0.15)',
+      overlay: 'rgba(5, 5, 16, 0.95)',
     },
 
     // Player semantic colors
     player: {
-      you: '#14B8A6', // Teal
-      youDark: '#042F2B',
-      youGlow: 'rgba(20, 184, 166, 0.45)',
-      opponent: '#FF6B6B', // Coral
-      opponentDark: '#331515',
-      opponentGlow: 'rgba(255, 107, 107, 0.45)',
+      you: '#22c55e', // Green
+      youDark: '#052e16',
+      youGlow: 'rgba(34, 197, 94, 0.5)',
+      opponent: '#ef4444', // Red
+      opponentDark: '#450a0a',
+      opponentGlow: 'rgba(239, 68, 68, 0.5)',
     },
 
     // Rank tier colors
     rank: {
       BRONZE: '#cd7f32',
-      SILVER: '#94a3b8',
-      GOLD: '#fbbf24',
-      PLATINUM: '#14B8A6',
-      DIAMOND: '#3B82F6',
-      MASTER: '#FF6B6B',
+      SILVER: '#c0c0c0',
+      GOLD: '#ffd700',
+      PLATINUM: '#00ffff',
+      DIAMOND: '#b9f2ff',
+      MASTER: '#ff00ff',
     },
 
     // State colors
-    success: '#14B8A6',
+    success: '#22c55e',
     warning: '#fbbf24',
-    error: '#FF6B6B',
-    info: '#3B82F6',
+    error: '#ef4444',
+    info: '#3b82f6',
 
     // Text hierarchy
     text: {
-      primary: '#F8FAFC',
-      secondary: '#94A3B8',
-      muted: '#64748B',
-      accent: '#14B8A6',
+      primary: '#f8fafc',
+      secondary: '#94a3b8',
+      muted: '#64748b',
+      accent: '#8b5cf6',
     },
 
     // Borders
     border: {
-      default: 'rgba(20, 184, 166, 0.2)',
-      active: '#14B8A6',
-      subtle: 'rgba(255, 255, 255, 0.08)',
+      default: 'rgba(99, 102, 241, 0.3)',
+      active: '#8b5cf6',
+      subtle: 'rgba(99, 102, 241, 0.1)',
     },
 
     // Puck
     puck: '#ffffff',
-    puckGlow: 'rgba(59, 130, 246, 0.5)',
+    puckGlow: 'rgba(255, 255, 255, 0.5)',
   },
 
   fonts: {

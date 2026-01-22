@@ -38,6 +38,17 @@ export interface DesignConfig {
 
     goalZone1: string;
     goalZone2: string;
+
+    // Extended colors for full app
+    primary?: string;
+    secondary?: string;
+    success?: string;
+    warning?: string;
+    error?: string;
+    navBackground?: string;
+    cardBackground?: string;
+    buttonPrimary?: string;
+    buttonSecondary?: string;
   };
 
   effects: {
@@ -54,6 +65,10 @@ export interface DesignConfig {
     body: string;
     score: string;
   };
+
+  // Background effects (optional)
+  backgroundEffect?: 'none' | 'gradient' | 'mesh' | 'particles' | 'grid';
+  backgroundGradient?: string;
 }
 
 export interface DesignComponents {

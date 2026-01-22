@@ -55,6 +55,11 @@ const WS_URL = typeof window !== 'undefined'
   : 'ws://localhost:3001/ws';
 const THROTTLE_MS = 16; // 60fps
 
+// Debug: Log the WebSocket URL being used
+if (typeof window !== 'undefined') {
+  console.log('[WebSocket] URL:', WS_URL, '| env:', process.env.NEXT_PUBLIC_WS_URL);
+}
+
 // =============================================================================
 // Hook Implementation
 // =============================================================================
@@ -405,7 +410,7 @@ export function useMultiplayerGame(
       cleanup();
       stopHeartbeat();
     };
-  }, [gameId, playerId, cleanup, startHeartbeat, stopHeartbeat, isConnected]);
+  }, [gameId, playerId, cleanup, startHeartbeat, stopHeartbeat]);
 
   return {
     // Connection state

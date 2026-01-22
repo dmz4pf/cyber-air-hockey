@@ -56,7 +56,26 @@ export interface PingMessage {
   type: 'ping';
 }
 
-export type ClientMessage = JoinRoomMessage | PaddleMoveMessage | PlayerReadyMessage | PingMessage;
+export interface PauseRequestMessage {
+  type: 'pause-request';
+}
+
+export interface ResumeRequestMessage {
+  type: 'resume-request';
+}
+
+export interface QuitGameMessage {
+  type: 'quit-game';
+}
+
+export type ClientMessage =
+  | JoinRoomMessage
+  | PaddleMoveMessage
+  | PlayerReadyMessage
+  | PingMessage
+  | PauseRequestMessage
+  | ResumeRequestMessage
+  | QuitGameMessage;
 
 // =============================================================================
 // Server → Client Messages
@@ -113,6 +132,31 @@ export interface PongMessage {
   type: 'pong';
 }
 
+export type PauseReason = 'player_pause' | 'opponent_pause' | 'connection_lost' | 'opponent_disconnected';
+
+export interface GamePausedMessage {
+  type: 'game-paused';
+  reason: PauseReason;
+  pausedBy: PlayerNumber | null;
+  canResume: boolean;
+  gracePeriodMs?: number;
+}
+
+export interface ResumeCountdownMessage {
+  type: 'resume-countdown';
+  seconds: number;
+}
+
+export interface GameResumedMessage {
+  type: 'game-resumed';
+}
+
+export interface OpponentQuitMessage {
+  type: 'opponent-quit';
+  winner: PlayerNumber;
+  finalScore: Score;
+}
+
 export type ServerMessage =
   | RoomJoinedMessage
   | OpponentJoinedMessage
@@ -122,7 +166,11 @@ export type ServerMessage =
   | GoalMessage
   | GameOverMessage
   | ErrorMessage
-  | PongMessage;
+  | PongMessage
+  | GamePausedMessage
+  | ResumeCountdownMessage
+  | GameResumedMessage
+  | OpponentQuitMessage;
 
 // =============================================================================
 // Type Guards - Client Messages
@@ -166,8 +214,40 @@ export function isPingMessage(msg: unknown): msg is PingMessage {
   );
 }
 
+export function isPauseRequestMessage(msg: unknown): msg is PauseRequestMessage {
+  return (
+    typeof msg === 'object' &&
+    msg !== null &&
+    (msg as PauseRequestMessage).type === 'pause-request'
+  );
+}
+
+export function isResumeRequestMessage(msg: unknown): msg is ResumeRequestMessage {
+  return (
+    typeof msg === 'object' &&
+    msg !== null &&
+    (msg as ResumeRequestMessage).type === 'resume-request'
+  );
+}
+
+export function isQuitGameMessage(msg: unknown): msg is QuitGameMessage {
+  return (
+    typeof msg === 'object' &&
+    msg !== null &&
+    (msg as QuitGameMessage).type === 'quit-game'
+  );
+}
+
 export function isClientMessage(msg: unknown): msg is ClientMessage {
-  return isJoinRoomMessage(msg) || isPaddleMoveMessage(msg) || isPlayerReadyMessage(msg) || isPingMessage(msg);
+  return (
+    isJoinRoomMessage(msg) ||
+    isPaddleMoveMessage(msg) ||
+    isPlayerReadyMessage(msg) ||
+    isPingMessage(msg) ||
+    isPauseRequestMessage(msg) ||
+    isResumeRequestMessage(msg) ||
+    isQuitGameMessage(msg)
+  );
 }
 
 // =============================================================================
@@ -276,7 +356,16 @@ export function isServerMessage(msg: unknown): msg is ServerMessage {
 // Message Type Constants
 // =============================================================================
 
-export const CLIENT_MESSAGE_TYPES = ['join-room', 'paddle-move', 'player-ready', 'ping'] as const;
+export const CLIENT_MESSAGE_TYPES = [
+  'join-room',
+  'paddle-move',
+  'player-ready',
+  'ping',
+  'pause-request',
+  'resume-request',
+  'quit-game',
+] as const;
+
 export const SERVER_MESSAGE_TYPES = [
   'room-joined',
   'opponent-joined',
@@ -287,6 +376,10 @@ export const SERVER_MESSAGE_TYPES = [
   'game-over',
   'error',
   'pong',
+  'game-paused',
+  'resume-countdown',
+  'game-resumed',
+  'opponent-quit',
 ] as const;
 
 export type ClientMessageType = (typeof CLIENT_MESSAGE_TYPES)[number];

@@ -37,6 +37,17 @@ export const arcticFrostConfig: DesignConfig = {
     // Goal zones: Subtle frost tints
     goalZone1: 'rgba(79, 195, 247, 0.15)',
     goalZone2: 'rgba(236, 239, 241, 0.2)',
+
+    // Extended colors for full app
+    primary: '#4FC3F7',
+    secondary: '#00B8D4',
+    success: '#26A69A',
+    warning: '#FFB74D',
+    error: '#EF5350',
+    navBackground: 'rgba(232, 244, 248, 0.98)',
+    cardBackground: 'rgba(212, 232, 240, 0.6)',
+    buttonPrimary: '#4FC3F7',
+    buttonSecondary: '#546E7A',
   },
   effects: {
     // Medium glow like soft ice reflection (0-30 range)
@@ -63,4 +74,6 @@ export const arcticFrostConfig: DesignConfig = {
     // Bold geometric for score display
     score: '"Rajdhani", "Orbitron", monospace',
   },
+  backgroundEffect: 'gradient',
+  backgroundGradient: 'linear-gradient(135deg, #E8F4F8 0%, #D4E8F0 50%, #C8E4EC 100%)',
 };

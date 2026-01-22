@@ -18,11 +18,14 @@ export function ScoreOverlay({ className = '' }: ScoreOverlayProps) {
   const scores = useGameStore((state) => state.scores);
   const combo = useGameStore((state) => state.combo);
   const difficulty = useGameStore((state) => state.difficulty);
+  const mode = useGameStore((state) => state.mode);
   const profile = usePlayerStore((state) => state.profile);
 
   const playerName = profile?.username || 'You';
-  const opponentName =
-    difficulty === 'easy'
+  // In multiplayer, show "Opponent" instead of AI difficulty
+  const opponentName = mode === 'multiplayer'
+    ? 'Opponent'
+    : difficulty === 'easy'
       ? 'Easy AI'
       : difficulty === 'medium'
       ? 'Medium AI'

@@ -1,15 +1,25 @@
 import type { WebSocket } from 'ws';
-import type { PhysicsEngine } from '../physics/engine';
-import type { ServerMessage } from './message-types';
+import type { PhysicsEngine, GameState } from '../physics/engine';
+import type { ServerMessage, PauseReason } from './message-types';
 
 export type { PhysicsEngine };
+
+export interface PauseState {
+  reason: PauseReason;
+  pausedBy: 1 | 2 | null;
+  pausedAt: number;
+  disconnectedPlayerId?: string;
+  savedGameState: GameState;
+  gracePeriodTimeout?: NodeJS.Timeout;
+}
 
 export interface GameRoom {
   gameId: string;
   players: Map<string, { ws: WebSocket; playerNumber: 1 | 2 }>;
-  state: 'waiting' | 'countdown' | 'playing' | 'ended';
+  state: 'waiting' | 'countdown' | 'playing' | 'paused' | 'resuming' | 'ended';
   physicsEngine: PhysicsEngine | null;
   broadcastInterval: NodeJS.Timeout | null;
+  pauseState: PauseState | null;
 }
 
 export class RoomManager {
@@ -30,6 +40,7 @@ export class RoomManager {
       state: 'waiting',
       physicsEngine: null,
       broadcastInterval: null,
+      pauseState: null,
     };
 
     this.rooms.set(gameId, room);
@@ -57,12 +68,27 @@ export class RoomManager {
       return { success: false, error: 'Room not found' };
     }
 
-    if (room.players.size >= 2) {
-      return { success: false, error: 'Room is full' };
+    // Check if player is already in the room
+    const existingPlayer = room.players.get(playerId);
+    if (existingPlayer) {
+      // Player is reconnecting with a new WebSocket - this is a valid scenario
+      // that happens during screen transitions (e.g., waiting -> ready)
+      console.log(`[RoomManager] Player ${playerId} reconnecting to room ${gameId}`);
+
+      // Remove the old WebSocket mapping
+      this.wsToRoom.delete(existingPlayer.ws);
+
+      // Update to new WebSocket while preserving player number
+      room.players.set(playerId, { ws, playerNumber: existingPlayer.playerNumber });
+
+      // Track new WebSocket for reverse lookup
+      this.wsToRoom.set(ws, { gameId, playerId });
+
+      return { success: true, playerNumber: existingPlayer.playerNumber };
     }
 
-    if (room.players.has(playerId)) {
-      return { success: false, error: 'Player already in room' };
+    if (room.players.size >= 2) {
+      return { success: false, error: 'Room is full' };
     }
 
     if (room.state !== 'waiting') {

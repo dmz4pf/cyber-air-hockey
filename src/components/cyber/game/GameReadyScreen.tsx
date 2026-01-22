@@ -1,18 +1,18 @@
 'use client';
 
 /**
- * GameReadyScreen - Both players connected, ready to start
+ * GameReadyScreen - Both players connected, game about to start
  *
- * Shows both players' wallet addresses and ready status.
- * Uses WebSocket for ready-up synchronization.
- * When both are ready, starts the countdown.
+ * Shows both players' wallet addresses and countdown status.
+ * With server-authoritative architecture, the game starts automatically
+ * once both players have joined (no manual ready-up needed).
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { cyberTheme } from '@/lib/cyber/theme';
 import { useGameStore } from '@/stores/gameStore';
 import { useDynamicWallet } from '@/hooks/useDynamicWallet';
-import { useWebSocket } from '@/hooks/useWebSocket';
+import { useMultiplayerContext } from '@/contexts/MultiplayerContext';
 import { HUDPanel } from '../ui/HUDPanel';
 import { CyberButton } from '../ui/CyberButton';
 
@@ -21,54 +21,67 @@ interface GameReadyScreenProps {
 }
 
 export function GameReadyScreen({ className = '' }: GameReadyScreenProps) {
-  const [isReadyLocal, setIsReadyLocal] = useState(false);
-
   const { shortAddress } = useDynamicWallet();
   const multiplayerGameInfo = useGameStore((s) => s.multiplayerGameInfo);
-  const storeOpponentReady = useGameStore((s) => s.opponentReady);
-  const setIsReady = useGameStore((s) => s.setIsReady);
-  const setOpponentReady = useGameStore((s) => s.setOpponentReady);
   const startMultiplayerMatch = useGameStore((s) => s.startMultiplayerMatch);
   const goToMultiplayerLobby = useGameStore((s) => s.goToMultiplayerLobby);
   const resetMultiplayer = useGameStore((s) => s.resetMultiplayer);
 
-  const gameId = multiplayerGameInfo?.gameId || 'XXXX-XXXX';
+  const gameId = multiplayerGameInfo?.gameId || '';
+  // Display roomCode (friendly format like "7FKK-YVWM") instead of numeric gameId
+  const displayGameId = multiplayerGameInfo?.roomCode || 'XXXX-XXXX';
   const isCreator = multiplayerGameInfo?.isCreator || false;
+  // Use the playerId stored in the game store (set when game was created/joined)
+  const playerId = multiplayerGameInfo?.playerId || '';
 
-  // WebSocket connection (should already be connected from previous screen)
+  // Shared WebSocket connection from context
   const {
-    isConnected: wsConnected,
-    opponentReady: wsOpponentReady,
+    isConnected,
+    connectionError,
     playerNumber,
-    setReady,
-    leaveRoom,
-  } = useWebSocket({
-    autoConnect: true,
-    onGameStart: (playerNum) => {
-      console.log('[GameReadyScreen] Game starting! Player number:', playerNum);
-      startMultiplayerMatch();
-    },
-  });
+    opponentJoined,
+    countdown,
+    gameStatus,
+    connect,
+    disconnect,
+  } = useMultiplayerContext();
 
-  // Sync opponent ready state from WebSocket
+  // Ensure connected to the game (connection should persist from WaitingScreen)
   useEffect(() => {
-    if (wsOpponentReady && !storeOpponentReady) {
-      console.log('[GameReadyScreen] Opponent is ready!');
-      setOpponentReady(true);
+    if (gameId && playerId) {
+      connect(gameId, playerId);
     }
-  }, [wsOpponentReady, storeOpponentReady, setOpponentReady]);
+  }, [gameId, playerId, connect]);
+
+  // Debug: Log all context state changes
+  useEffect(() => {
+    console.log('[GameReadyScreen] Context state:', {
+      isConnected,
+      playerNumber,
+      opponentJoined,
+      countdown,
+      gameStatus,
+    });
+  }, [isConnected, playerNumber, opponentJoined, countdown, gameStatus]);
+
+  // When game transitions to playing, start the match
+  useEffect(() => {
+    console.log('[GameReadyScreen] Checking gameStatus:', gameStatus);
+    if (gameStatus === 'playing') {
+      console.log('[GameReadyScreen] Game starting! Calling startMultiplayerMatch()');
+      startMultiplayerMatch();
+    }
+  }, [gameStatus, startMultiplayerMatch]);
 
   // Get opponent wallet display
   const getOpponentDisplay = () => {
     if (isCreator) {
-      // Creator sees opponent wallet
       const opponentWallet = multiplayerGameInfo?.opponentWallet;
       if (opponentWallet) {
         return `${opponentWallet.slice(0, 6)}...${opponentWallet.slice(-4)}`;
       }
       return 'Connecting...';
     } else {
-      // Joiner sees creator wallet
       const creatorWallet = multiplayerGameInfo?.creatorWallet;
       if (creatorWallet) {
         return `${creatorWallet.slice(0, 6)}...${creatorWallet.slice(-4)}`;
@@ -77,25 +90,14 @@ export function GameReadyScreen({ className = '' }: GameReadyScreenProps) {
     }
   };
 
-  const handleReady = () => {
-    setIsReadyLocal(true);
-    setIsReady(true);
-
-    // Send ready signal via WebSocket
-    if (wsConnected) {
-      console.log('[GameReadyScreen] Sending ready signal');
-      setReady();
-    }
-  };
-
   const handleCancel = () => {
-    leaveRoom();
+    disconnect();
     resetMultiplayer();
     goToMultiplayerLobby();
   };
 
-  // Determine if opponent is ready (from WebSocket or store)
-  const opponentIsReady = wsOpponentReady || storeOpponentReady;
+  const isInCountdown = gameStatus === 'countdown' && countdown !== null;
+  const isWaitingForOpponent = !opponentJoined;
 
   return (
     <div
@@ -131,18 +133,18 @@ export function GameReadyScreen({ className = '' }: GameReadyScreenProps) {
               fontFamily: cyberTheme.fonts.heading,
             }}
           >
-            MATCH READY
+            {isInCountdown ? 'MATCH STARTING' : 'MATCH READY'}
           </h1>
           <div
             className="font-mono text-sm"
             style={{ color: cyberTheme.colors.text.muted }}
           >
-            Game ID: <span style={{ color: cyberTheme.colors.primary }}>{gameId}</span>
+            Game ID: <span style={{ color: cyberTheme.colors.primary }}>{displayGameId}</span>
           </div>
         </div>
 
         {/* Connection Status */}
-        {!wsConnected && (
+        {!isConnected && (
           <div
             className="p-3 rounded-lg text-center mb-6"
             style={{
@@ -151,8 +153,23 @@ export function GameReadyScreen({ className = '' }: GameReadyScreenProps) {
             }}
           >
             <span className="text-sm" style={{ color: cyberTheme.colors.warning }}>
-              Reconnecting to game server...
+              {connectionError || 'Reconnecting to game server...'}
             </span>
+          </div>
+        )}
+
+        {/* Countdown Display */}
+        {isInCountdown && (
+          <div className="text-center mb-8">
+            <div
+              className="text-8xl font-black animate-pulse"
+              style={{
+                color: cyberTheme.colors.primary,
+                textShadow: cyberTheme.shadows.glowText(cyberTheme.colors.primary),
+              }}
+            >
+              {countdown}
+            </div>
           </div>
         )}
 
@@ -163,21 +180,18 @@ export function GameReadyScreen({ className = '' }: GameReadyScreenProps) {
             className="p-4 rounded-lg text-center"
             style={{
               backgroundColor: cyberTheme.colors.bg.tertiary,
-              border: `2px solid ${isReadyLocal ? cyberTheme.colors.success : cyberTheme.colors.border.default}`,
-              boxShadow: isReadyLocal ? cyberTheme.shadows.glow(cyberTheme.colors.success) : 'none',
+              border: `2px solid ${isConnected ? cyberTheme.colors.success : cyberTheme.colors.border.default}`,
+              boxShadow: isConnected ? cyberTheme.shadows.glow(cyberTheme.colors.success) : 'none',
             }}
           >
-            <div
-              className="text-4xl mb-3"
-              style={{ filter: isReadyLocal ? 'none' : 'grayscale(1) opacity(0.5)' }}
-            >
-              {isCreator ? '👑' : '🎮'}
+            <div className="text-4xl mb-3">
+              {playerNumber === 1 ? '👑' : '🎮'}
             </div>
             <div
               className="text-xs uppercase tracking-wider mb-2"
               style={{ color: cyberTheme.colors.text.muted }}
             >
-              {isCreator ? 'Host (You)' : 'You'}
+              {playerNumber === 1 ? 'Player 1 (You)' : 'Player 2 (You)'}
             </div>
             <div
               className="font-mono text-sm mb-3"
@@ -188,15 +202,11 @@ export function GameReadyScreen({ className = '' }: GameReadyScreenProps) {
             <div
               className="text-xs uppercase tracking-wider py-1 px-3 rounded-full inline-block"
               style={{
-                backgroundColor: isReadyLocal
-                  ? `${cyberTheme.colors.success}20`
-                  : `${cyberTheme.colors.warning}20`,
-                color: isReadyLocal
-                  ? cyberTheme.colors.success
-                  : cyberTheme.colors.warning,
+                backgroundColor: `${cyberTheme.colors.success}20`,
+                color: cyberTheme.colors.success,
               }}
             >
-              {isReadyLocal ? 'READY' : 'NOT READY'}
+              CONNECTED
             </div>
           </div>
 
@@ -205,40 +215,40 @@ export function GameReadyScreen({ className = '' }: GameReadyScreenProps) {
             className="p-4 rounded-lg text-center"
             style={{
               backgroundColor: cyberTheme.colors.bg.tertiary,
-              border: `2px solid ${opponentIsReady ? cyberTheme.colors.success : cyberTheme.colors.border.default}`,
-              boxShadow: opponentIsReady ? cyberTheme.shadows.glow(cyberTheme.colors.success) : 'none',
+              border: `2px solid ${opponentJoined ? cyberTheme.colors.success : cyberTheme.colors.border.default}`,
+              boxShadow: opponentJoined ? cyberTheme.shadows.glow(cyberTheme.colors.success) : 'none',
             }}
           >
             <div
               className="text-4xl mb-3"
-              style={{ filter: opponentIsReady ? 'none' : 'grayscale(1) opacity(0.5)' }}
+              style={{ filter: opponentJoined ? 'none' : 'grayscale(1) opacity(0.5)' }}
             >
-              {isCreator ? '🎮' : '👑'}
+              {playerNumber === 1 ? '🎮' : '👑'}
             </div>
             <div
               className="text-xs uppercase tracking-wider mb-2"
               style={{ color: cyberTheme.colors.text.muted }}
             >
-              {isCreator ? 'Opponent' : 'Host'}
+              {playerNumber === 1 ? 'Player 2' : 'Player 1'}
             </div>
             <div
               className="font-mono text-sm mb-3"
               style={{ color: cyberTheme.colors.player.opponent }}
             >
-              {getOpponentDisplay()}
+              {opponentJoined ? getOpponentDisplay() : 'Waiting...'}
             </div>
             <div
               className="text-xs uppercase tracking-wider py-1 px-3 rounded-full inline-block"
               style={{
-                backgroundColor: opponentIsReady
+                backgroundColor: opponentJoined
                   ? `${cyberTheme.colors.success}20`
                   : `${cyberTheme.colors.warning}20`,
-                color: opponentIsReady
+                color: opponentJoined
                   ? cyberTheme.colors.success
                   : cyberTheme.colors.warning,
               }}
             >
-              {opponentIsReady ? 'READY' : 'NOT READY'}
+              {opponentJoined ? 'CONNECTED' : 'WAITING'}
             </div>
           </div>
         </div>
@@ -254,44 +264,35 @@ export function GameReadyScreen({ className = '' }: GameReadyScreenProps) {
           VS
         </div>
 
-        {/* Ready Button or Status */}
-        {!isReadyLocal ? (
-          <div className="text-center space-y-4">
-            <CyberButton
-              variant="success"
-              size="lg"
-              onClick={handleReady}
-              className="w-full"
-              disabled={!wsConnected}
+        {/* Status Message */}
+        <div className="text-center space-y-4">
+          {isWaitingForOpponent && (
+            <div
+              className="text-lg animate-pulse"
+              style={{ color: cyberTheme.colors.warning }}
             >
-              Ready Up
-            </CyberButton>
-            <p
-              className="text-sm"
-              style={{ color: cyberTheme.colors.text.muted }}
+              Waiting for opponent to join...
+            </div>
+          )}
+
+          {opponentJoined && !isInCountdown && (
+            <div
+              className="text-lg animate-pulse"
+              style={{ color: cyberTheme.colors.info }}
             >
-              Press ready when you&apos;re prepared to start
-            </p>
-          </div>
-        ) : (
-          <div className="text-center space-y-4">
-            {isReadyLocal && opponentIsReady ? (
-              <div
-                className="text-xl font-bold uppercase animate-pulse"
-                style={{ color: cyberTheme.colors.success }}
-              >
-                Starting match...
-              </div>
-            ) : (
-              <div
-                className="text-lg"
-                style={{ color: cyberTheme.colors.warning }}
-              >
-                Waiting for opponent to ready up...
-              </div>
-            )}
-          </div>
-        )}
+              Both players connected! Starting soon...
+            </div>
+          )}
+
+          {isInCountdown && (
+            <div
+              className="text-xl font-bold uppercase"
+              style={{ color: cyberTheme.colors.success }}
+            >
+              Get Ready!
+            </div>
+          )}
+        </div>
 
         {/* Cancel button */}
         <div className="mt-6 text-center">
@@ -299,7 +300,7 @@ export function GameReadyScreen({ className = '' }: GameReadyScreenProps) {
             variant="ghost"
             size="sm"
             onClick={handleCancel}
-            disabled={isReadyLocal && opponentIsReady}
+            disabled={isInCountdown}
           >
             Leave Match
           </CyberButton>

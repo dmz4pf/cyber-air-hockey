@@ -7,11 +7,11 @@
  * Manages WebSocket connection and room creation.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { cyberTheme } from '@/lib/cyber/theme';
 import { useGameStore } from '@/stores/gameStore';
 import { useDynamicWallet } from '@/hooks/useDynamicWallet';
-import { useWebSocket } from '@/hooks/useWebSocket';
+import { useMultiplayerContext } from '@/contexts/MultiplayerContext';
 import { HUDPanel } from '../ui/HUDPanel';
 import { CyberButton } from '../ui/CyberButton';
 
@@ -22,7 +22,6 @@ interface WaitingForOpponentScreenProps {
 export function WaitingForOpponentScreen({ className = '' }: WaitingForOpponentScreenProps) {
   const [copied, setCopied] = useState(false);
   const [dots, setDots] = useState('');
-  const [wsError, setWsError] = useState<string | null>(null);
 
   const { shortAddress } = useDynamicWallet();
   const multiplayerGameInfo = useGameStore((s) => s.multiplayerGameInfo);
@@ -31,21 +30,29 @@ export function WaitingForOpponentScreen({ className = '' }: WaitingForOpponentS
   const goToMultiplayerLobby = useGameStore((s) => s.goToMultiplayerLobby);
   const resetMultiplayer = useGameStore((s) => s.resetMultiplayer);
 
-  const gameId = multiplayerGameInfo?.gameId || 'XXXX-XXXX';
+  const gameId = multiplayerGameInfo?.gameId || '';
+  // Display roomCode (friendly format) but use gameId for API/WebSocket
+  const displayGameId = multiplayerGameInfo?.roomCode || 'XXXX-XXXX';
+  // Use the playerId stored in the game store (set when game was created)
+  const playerId = multiplayerGameInfo?.playerId || '';
 
-  // WebSocket connection
+  // Shared WebSocket connection from context
   const {
-    isConnected: wsConnected,
-    connectionStatus,
-    roomId,
-    opponentConnected,
-    error: wsHookError,
+    isConnected,
+    isConnecting,
+    connectionError,
+    playerNumber,
+    opponentJoined,
     connect,
-    createRoom,
-    leaveRoom,
-  } = useWebSocket({
-    autoConnect: true,
-  });
+    disconnect,
+  } = useMultiplayerContext();
+
+  // Connect to the game when component mounts
+  useEffect(() => {
+    if (gameId && playerId) {
+      connect(gameId, playerId);
+    }
+  }, [gameId, playerId, connect]);
 
   // Animated dots for "Waiting..."
   useEffect(() => {
@@ -55,34 +62,29 @@ export function WaitingForOpponentScreen({ className = '' }: WaitingForOpponentS
     return () => clearInterval(interval);
   }, []);
 
-  // Create room when WebSocket connects
+  // Debug: Log connection state changes
   useEffect(() => {
-    if (wsConnected && !roomId && gameId) {
-      console.log('[WaitingScreen] Creating room with ID:', gameId);
-      createRoom(gameId); // Pass the game ID to the server
-    }
-  }, [wsConnected, roomId, gameId, createRoom]);
+    console.log('[WaitingScreen] Context state:', {
+      isConnected,
+      isConnecting,
+      playerNumber,
+      opponentJoined,
+    });
+  }, [isConnected, isConnecting, playerNumber, opponentJoined]);
 
   // Handle opponent joining
   useEffect(() => {
-    if (opponentConnected) {
-      console.log('[WaitingScreen] Opponent connected!');
+    if (opponentJoined) {
+      console.log('[WaitingScreen] Opponent connected! Transitioning to ready screen');
       setOpponentConnected(true);
       // Transition to ready screen
       setPageState('ready');
     }
-  }, [opponentConnected, setOpponentConnected, setPageState]);
-
-  // Handle WebSocket errors
-  useEffect(() => {
-    if (wsHookError) {
-      setWsError(wsHookError);
-    }
-  }, [wsHookError]);
+  }, [opponentJoined, setOpponentConnected, setPageState]);
 
   const handleCopyId = async () => {
     try {
-      await navigator.clipboard.writeText(gameId);
+      await navigator.clipboard.writeText(displayGameId);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -92,22 +94,17 @@ export function WaitingForOpponentScreen({ className = '' }: WaitingForOpponentS
 
   const handleCancel = () => {
     // Leave WebSocket room and reset multiplayer state
-    leaveRoom();
+    disconnect();
     resetMultiplayer();
     goToMultiplayerLobby();
   };
 
-  const handleRetryConnection = () => {
-    setWsError(null);
-    connect();
-  };
-
   // Show connection status
   const getConnectionStatus = () => {
-    if (wsError) return 'error';
-    if (connectionStatus === 'connecting' || connectionStatus === 'reconnecting') return 'connecting';
-    if (!wsConnected) return 'disconnected';
-    if (!roomId) return 'creating-room';
+    if (connectionError) return 'error';
+    if (isConnecting) return 'connecting';
+    if (!isConnected) return 'disconnected';
+    if (!playerNumber) return 'creating-room';
     return 'ready';
   };
 
@@ -209,7 +206,7 @@ export function WaitingForOpponentScreen({ className = '' }: WaitingForOpponentS
               textShadow: cyberTheme.shadows.glowText(cyberTheme.colors.primary),
             }}
           >
-            {gameId}
+            {displayGameId}
           </div>
           <CyberButton
             variant="secondary"
@@ -288,9 +285,9 @@ export function WaitingForOpponentScreen({ className = '' }: WaitingForOpponentS
                 </span>
               </div>
               <p className="text-xs" style={{ color: cyberTheme.colors.text.muted }}>
-                {wsError}
+                {connectionError}
               </p>
-              <CyberButton variant="secondary" size="sm" onClick={handleRetryConnection}>
+              <CyberButton variant="secondary" size="sm" onClick={() => window.location.reload()}>
                 Retry Connection
               </CyberButton>
             </div>
@@ -310,7 +307,7 @@ export function WaitingForOpponentScreen({ className = '' }: WaitingForOpponentS
                   Disconnected
                 </span>
               </div>
-              <CyberButton variant="secondary" size="sm" onClick={handleRetryConnection}>
+              <CyberButton variant="secondary" size="sm" onClick={() => window.location.reload()}>
                 Reconnect
               </CyberButton>
             </div>

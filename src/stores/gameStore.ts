@@ -42,11 +42,13 @@ export type GamePageState =
 
 // Multiplayer game info (blockchain-based)
 export interface MultiplayerGameInfo {
-  gameId: string;              // Blockchain game ID (e.g., "A3B7-K9M2")
+  gameId: string;              // Blockchain game ID (numeric like "6")
+  roomCode: string;            // Display code for sharing (e.g., "A3B7-K9M2")
   creatorWallet: string;       // Creator's wallet address
   opponentWallet: string | null; // Opponent's wallet (null until joined)
   createdAt: number;           // Unix timestamp
   isCreator: boolean;          // True if current user created this game
+  playerId: string;            // Stable playerId for WebSocket connections
 }
 
 interface GameStore {
@@ -101,6 +103,7 @@ interface GameStore {
   setOpponentReady: (ready: boolean) => void;
   setIsReady: (ready: boolean) => void;
   setMultiplayerScores: (scores: Scores) => void;
+  setMultiplayerGameOver: (winner: 1 | 2, finalScore: Scores) => void;
   resetMultiplayer: () => void;
 
   // Mode actions
@@ -108,10 +111,10 @@ interface GameStore {
   setMultiplayerGameInfo: (info: MultiplayerGameInfo | null) => void;
 
   // Create game flow
-  createMultiplayerGame: (gameId: string, creatorWallet: string) => void;
+  createMultiplayerGame: (gameId: string, roomCode: string, creatorWallet: string, playerId: string) => void;
 
   // Join game flow
-  joinMultiplayerGame: (gameId: string, creatorWallet: string, opponentWallet: string) => void;
+  joinMultiplayerGame: (gameId: string, roomCode: string, creatorWallet: string, opponentWallet: string, playerId: string) => void;
 
   // Start multiplayer game (both ready)
   startMultiplayerMatch: () => void;
@@ -221,6 +224,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setIsReady: (ready) => set({ isReady: ready }),
   setMultiplayerScores: (scores) => set({ scores }),
 
+  setMultiplayerGameOver: (winnerNum, finalScore) => {
+    // Convert 1|2 to 'player1'|'player2'
+    const winnerPlayer: Player = winnerNum === 1 ? 'player1' : 'player2';
+    set({
+      scores: finalScore,
+      winner: winnerPlayer,
+      status: 'gameover',
+      pageState: 'gameover',
+    });
+  },
+
   resetMultiplayer: () =>
     set({
       playerNumber: null,
@@ -240,7 +254,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setMultiplayerGameInfo: (info) => set({ multiplayerGameInfo: info }),
 
   // Create multiplayer game (called after blockchain TX succeeds)
-  createMultiplayerGame: (gameId, creatorWallet) => {
+  createMultiplayerGame: (gameId, roomCode, creatorWallet, playerId) => {
     set({
       pageState: 'waiting',
       gameModeType: 'multiplayer',
@@ -250,16 +264,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
       roomId: gameId,
       multiplayerGameInfo: {
         gameId,
+        roomCode,
         creatorWallet,
         opponentWallet: null,
         createdAt: Date.now(),
         isCreator: true,
+        playerId, // Store playerId for consistent WebSocket connections
       },
     });
   },
 
   // Join multiplayer game (called after blockchain TX succeeds)
-  joinMultiplayerGame: (gameId, creatorWallet, opponentWallet) => {
+  joinMultiplayerGame: (gameId, roomCode, creatorWallet, opponentWallet, playerId) => {
     set({
       pageState: 'ready',
       gameModeType: 'multiplayer',
@@ -270,24 +286,32 @@ export const useGameStore = create<GameStore>((set, get) => ({
       opponentConnected: true,
       multiplayerGameInfo: {
         gameId,
+        roomCode,
         creatorWallet,
         opponentWallet,
         createdAt: Date.now(),
         isCreator: false,
+        playerId, // Store playerId for consistent WebSocket connections
       },
     });
   },
 
   // Start multiplayer match (both players ready)
+  // NOTE: In multiplayer, the server is authoritative. When this is called,
+  // the server has already transitioned to 'playing' state. We set pageState
+  // to 'playing' directly to show the game canvas. The useMultiplayerGameEngine
+  // hook will receive state-update messages and sync the game state from server.
   startMultiplayerMatch: () => {
     const { multiplayerGameInfo } = get();
     set({
-      status: 'countdown',
-      pageState: 'countdown',
+      status: 'playing',
+      pageState: 'playing',
+      mode: 'multiplayer', // Explicitly set to ensure multiplayer mode is active
+      gameModeType: 'multiplayer',
       scores: { player1: 0, player2: 0 },
       lastScorer: null,
       winner: null,
-      countdown: PHYSICS_CONFIG.game.countdownSeconds,
+      countdown: 0, // Server already finished countdown
       combo: { ...initialCombo },
       matchMetadata: {
         id: multiplayerGameInfo?.gameId || generateId(),

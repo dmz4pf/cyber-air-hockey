@@ -37,7 +37,7 @@ export interface UseLineraGameReturn {
 
   // Game Operations
   createGame: (stake: string, roomCode: string) => Promise<string>;
-  joinGame: (gameId: string) => Promise<void>;
+  joinGame: (gameIdOrRoomCode: string) => Promise<{ gameId: string; game: Game }>;
   submitResult: (gameId: string, player1Score: number, player2Score: number) => Promise<void>;
   cancelGame: (gameId: string) => Promise<void>;
 
@@ -93,10 +93,10 @@ export function useLineraGame(): UseLineraGameReturn {
     }
   }, [contextCreateGame]);
 
-  const joinGame = useCallback(async (gameId: string): Promise<void> => {
+  const joinGame = useCallback(async (gameIdOrRoomCode: string): Promise<{ gameId: string; game: Game }> => {
     setOperationLoading(true);
     try {
-      await contextJoinGame(gameId);
+      return await contextJoinGame(gameIdOrRoomCode);
     } finally {
       setOperationLoading(false);
     }

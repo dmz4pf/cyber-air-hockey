@@ -1,10 +1,10 @@
 /**
  * Air Hockey Theme System
- * 4 World-Class Themes - NO PURPLE
+ * 5 World-Class Themes
  * Each theme is a complete visual identity with unique animations
  */
 
-export type ThemeId = 'arcade' | 'retro' | 'premium' | 'electric';
+export type ThemeId = 'cyber' | 'arcade' | 'retro' | 'premium' | 'electric';
 
 export interface ThemeColors {
   // Background
@@ -92,6 +92,74 @@ export interface Theme {
   // Border radius style
   borderRadius: string;
 }
+
+// ============================================
+// THEME 0: CYBER ESPORTS
+// Purple neon on deep navy - esports competitive vibes
+// COMPETE • DOMINATE • WIN
+// ============================================
+export const cyberTheme: Theme = {
+  id: 'cyber',
+  name: 'Cyber Esports',
+  description: 'Purple neon on deep navy. Competitive esports aesthetics.',
+  tagline: 'DOMINATE THE ARENA',
+  colors: {
+    background: '#050510',
+    backgroundGradient: 'radial-gradient(ellipse at center, #0a0a20 0%, #050510 100%)',
+    backgroundSecondary: '#0a0a20',
+    table: '#080818',
+    tableBorder: '#8b5cf6',
+    centerLine: '#8b5cf650',
+    centerCircle: '#8b5cf640',
+    goalPlayer1: '#22c55e40',
+    goalPlayer2: '#ef444440',
+    puck: '#ffffff',
+    puckGlow: '#8b5cf6',
+    paddle1: '#22c55e',
+    paddle1Glow: '#22c55e',
+    paddle1Inner: '#052e16',
+    paddle2: '#ef4444',
+    paddle2Glow: '#ef4444',
+    paddle2Inner: '#450a0a',
+    primary: '#8b5cf6',
+    secondary: '#6366f1',
+    accent: '#a78bfa',
+    text: '#f8fafc',
+    textMuted: '#64748b',
+    score1: '#22c55e',
+    score2: '#ef4444',
+  },
+  effects: {
+    glowIntensity: 20,
+    trailEffect: true,
+    particles: false,
+    scanlines: false,
+    blur: 0,
+    screenCurvature: false,
+    phosphorBloom: false,
+    starfield: false,
+    meshGradient: true,
+    metallicShimmer: false,
+    ambientLight: true,
+  },
+  fonts: {
+    heading: "'Orbitron', sans-serif",
+    body: "'Inter', sans-serif",
+    score: "'Orbitron', sans-serif",
+  },
+  animations: {
+    scoreChange: 'cyber-score-pop',
+    victory: 'cyber-victory',
+    defeat: 'cyber-defeat',
+    buttonHover: 'cyber-btn-hover',
+    buttonClick: 'cyber-btn-click',
+    cardEnter: 'cyber-card-enter',
+    screenFlash: 'cyber-flash',
+    idle: 'cyber-idle-pulse',
+  },
+  cssPrefix: 'cyber',
+  borderRadius: '12px',
+};
 
 // ============================================
 // THEME 1: ARCADE CLASSIC
@@ -367,6 +435,7 @@ export const electricTheme: Theme = {
 };
 
 export const themes: Record<ThemeId, Theme> = {
+  cyber: cyberTheme,
   arcade: arcadeTheme,
   retro: retroTheme,
   premium: premiumTheme,
@@ -375,7 +444,7 @@ export const themes: Record<ThemeId, Theme> = {
 
 export const themeList = Object.values(themes);
 
-export const defaultTheme: ThemeId = 'arcade';
+export const defaultTheme: ThemeId = 'cyber';
 
 // Helper function to get CSS variables from theme
 export function getThemeCSSVariables(theme: Theme): Record<string, string> {

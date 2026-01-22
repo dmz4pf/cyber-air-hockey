@@ -11,17 +11,18 @@ export const PHYSICS_CONFIG = {
   puck: {
     radius: 12,
     mass: 0.1,
-    restitution: 0.98,
+    restitution: 0.85,      // Reduced from 0.98 - walls absorb some energy
     friction: 0,
-    frictionAir: 0.0005,
-    maxSpeed: 25
+    frictionAir: 0.002,     // Increased from 0.0005 - puck slows down faster
+    maxSpeed: 20,           // Reduced from 25 - lower top speed
+    minSpeed: 2             // Minimum speed to prevent tediously slow gameplay
   },
   paddle: {
     radius: 25,
     mass: 1,
     restitution: 0.8,
     friction: 0.1,
-    velocityTransfer: 0.5,
+    velocityTransfer: 0.7,  // Increased from 0.5 - paddle speed matters more
     maxVelocity: 15
   },
   wall: {

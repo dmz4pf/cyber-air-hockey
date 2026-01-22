@@ -37,6 +37,17 @@ export const moltenCoreConfig: DesignConfig = {
     // Goal zones: Magma pools
     goalZone1: 'rgba(255, 102, 0, 0.3)',
     goalZone2: 'rgba(204, 0, 0, 0.3)',
+
+    // Extended colors for full app
+    primary: '#ff6600',
+    secondary: '#cc0000',
+    success: '#4ade80',
+    warning: '#ffdd00',
+    error: '#ff3333',
+    navBackground: 'rgba(10, 6, 4, 0.98)',
+    cardBackground: '#1c1210',
+    buttonPrimary: '#ff6600',
+    buttonSecondary: '#cc0000',
   },
   effects: {
     // Maximum glow for that molten metal look (0-30 range)
@@ -63,4 +74,6 @@ export const moltenCoreConfig: DesignConfig = {
     body: "'Teko', 'Rajdhani', sans-serif",
     score: "'Black Ops One', 'Impact', sans-serif",
   },
+  backgroundEffect: 'gradient',
+  backgroundGradient: 'radial-gradient(ellipse at center bottom, #2a1510 0%, #0a0604 60%), radial-gradient(ellipse at top, #1a0e08 0%, #0a0604 70%)',
 };

@@ -7,7 +7,7 @@
  * On success, generates unique game ID and transitions to waiting state.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { cyberTheme } from '@/lib/cyber/theme';
 import { useDynamicWallet } from '@/hooks/useDynamicWallet';
 import { useLineraGame } from '@/hooks/useLineraGame';
@@ -32,21 +32,30 @@ export function CreateGameModal({ isOpen, onClose }: CreateGameModalProps) {
   const { createGame, isLoading } = useLineraGame();
   const createMultiplayerGame = useGameStore((s) => s.createMultiplayerGame);
 
+  // Generate stable playerId once per modal instance - will be stored in game store
+  // Append "-creator" to distinguish from joiner even if same wallet is used (testing on same machine)
+  const playerId = useMemo(() => {
+    const base = address || `player-${Math.random().toString(36).slice(2, 10)}`;
+    return `${base}-creator`;
+  }, [address]);
+
   const handleCreateGame = async () => {
     setState('creating');
     setError(null);
 
     try {
-      // Generate unique game ID
-      const newGameId = generateGameId();
-      setGameId(newGameId);
+      // Generate unique room code for display
+      const roomCode = generateGameId();
 
-      // Create game on Linera blockchain
+      // Create game on Linera blockchain - returns actual gameId
       // Using "0" stake for now - can be made configurable later
-      await createGame('0', newGameId);
+      const actualGameId = await createGame('0', roomCode);
 
-      // Update store with new game
-      createMultiplayerGame(newGameId, address || 'local-player');
+      // Display the roomCode to user (more friendly than numeric ID)
+      setGameId(roomCode);
+
+      // Update store with actual gameId for API calls, roomCode for display, and playerId for WebSocket
+      createMultiplayerGame(actualGameId, roomCode, address || 'local-player', playerId);
 
       setState('success');
 

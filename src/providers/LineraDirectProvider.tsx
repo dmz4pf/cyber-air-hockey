@@ -44,7 +44,7 @@ export interface LineraContextValue {
 
   // Game operations
   createGame: (stake: string, roomCode: string) => Promise<string>;
-  joinGame: (gameId: string) => Promise<void>;
+  joinGame: (gameIdOrRoomCode: string) => Promise<{ gameId: string; game: Game }>;
   getOpenGames: () => Promise<Game[]>;
   getMyGames: () => Promise<Game[]>;
   getGame: (gameId: string) => Promise<Game | null>;
@@ -162,13 +162,14 @@ export function LineraDirectProvider({ children }: LineraDirectProviderProps) {
     }
   }, [isConnected]);
 
-  const joinGame = useCallback(async (gameId: string): Promise<void> => {
+  const joinGame = useCallback(async (gameIdOrRoomCode: string): Promise<{ gameId: string; game: Game }> => {
     if (!isConnected) {
       throw new Error('Not connected to Linera backend');
     }
 
     try {
-      await lineraAPI.joinGame(gameId);
+      const result = await lineraAPI.joinGame(gameIdOrRoomCode);
+      return { gameId: result.gameId, game: result.game };
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Failed to join game');
       setError(error);

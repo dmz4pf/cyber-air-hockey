@@ -37,18 +37,40 @@ interface DesignContextType {
 
 const DesignContext = createContext<DesignContextType | null>(null);
 
-export function DesignProvider({ children }: { children: ReactNode }) {
-  const [designId, setDesignId] = useState<DesignId>('neon-arcade');
+interface DesignProviderProps {
+  children: ReactNode;
+  initialDesign?: DesignId;
+}
 
-  // Load saved preference
+// Validate if a string is a valid DesignId
+function isValidDesignId(id: string): id is DesignId {
+  return id in designConfigs;
+}
+
+const DEFAULT_DESIGN: DesignId = 'cyber-esports';
+
+export function DesignProvider({ children, initialDesign }: DesignProviderProps) {
+  // Validate initialDesign, fall back to default if invalid
+  const validInitialDesign = initialDesign && isValidDesignId(initialDesign)
+    ? initialDesign
+    : DEFAULT_DESIGN;
+
+  const [designId, setDesignId] = useState<DesignId>(validInitialDesign);
+
+  // Load saved preference only if no initial design is provided
   useEffect(() => {
-    const saved = localStorage.getItem('air-hockey-design');
-    if (saved && saved in designConfigs) {
-      setDesignId(saved as DesignId);
+    if (initialDesign && isValidDesignId(initialDesign)) {
+      setDesignId(initialDesign);
+      return;
     }
-  }, []);
+    const saved = localStorage.getItem('air-hockey-design');
+    if (saved && isValidDesignId(saved)) {
+      setDesignId(saved);
+    }
+  }, [initialDesign]);
 
   const setDesign = (id: DesignId) => {
+    if (!isValidDesignId(id)) return;
     setDesignId(id);
     localStorage.setItem('air-hockey-design', id);
   };

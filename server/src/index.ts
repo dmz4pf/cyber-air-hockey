@@ -22,7 +22,7 @@ const app = express()
 app.use(express.json());
 app.use(
   cors({
-    origin: ['http://localhost:3000', 'http://localhost:3005'],
+    origin: true, // Allow all origins for development
     credentials: true,
   })
 );
@@ -102,13 +102,13 @@ app.get('/api/games/:id', async (req: Request, res: Response, next: NextFunction
   }
 });
 
-// Join a game
+// Join a game (accepts gameId or roomCode)
 app.post('/api/games/:id/join', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const gameId = req.params.id;
+    const gameIdOrRoomCode = req.params.id;
 
-    await lineraService.joinGame(gameId);
-    res.json({ success: true });
+    const result = await lineraService.joinGame(gameIdOrRoomCode);
+    res.json({ success: true, gameId: result.gameId, game: result.game });
   } catch (error) {
     next(error);
   }

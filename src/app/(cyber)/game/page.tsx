@@ -10,6 +10,12 @@
  * - waiting: Creator waiting for opponent
  * - ready: Both connected, ready up
  * - countdown/playing/paused/goal/gameover: Game states
+ *
+ * Architecture:
+ * - AI Mode: Uses local physics engine (useGameEngine)
+ * - Multiplayer Mode: Uses server-authoritative model (useMultiplayerGameEngine)
+ *   - Server runs physics and broadcasts state at 30Hz
+ *   - Client only renders server state and sends paddle inputs
  */
 
 import React, { useRef, useEffect, useCallback } from 'react';
@@ -18,8 +24,10 @@ import { cyberTheme } from '@/lib/cyber/theme';
 import { useGameStore, GamePageState } from '@/stores/gameStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useGameEngine } from '@/hooks/useGameEngine';
+import { useMultiplayerGameEngine } from '@/hooks/useMultiplayerGameEngine';
 import { usePlayerInput } from '@/hooks/usePlayerInput';
 import { useAIOpponent } from '@/hooks/useAIOpponent';
+import { useDynamicWallet } from '@/hooks/useDynamicWallet';
 import { GameCanvas, GameCanvasRef } from '@/components/game/GameCanvas';
 import {
   GameHUD,
@@ -30,11 +38,16 @@ import {
   WaitingForOpponentScreen,
   GameReadyScreen,
 } from '@/components/cyber/game';
+import { MultiplayerPauseOverlay } from '@/components/cyber/game/MultiplayerPauseOverlay';
+import { OpponentQuitModal } from '@/components/cyber/game/OpponentQuitModal';
 
 export default function CyberGamePage() {
   const gameCanvasRef = useRef<GameCanvasRef>(null);
   const canvasElementRef = useRef<HTMLCanvasElement | null>(null);
   const router = useRouter();
+
+  // Wallet connection
+  useDynamicWallet();
 
   const pageState = useGameStore((state) => state.pageState);
   const status = useGameStore((state) => state.status);
@@ -43,11 +56,22 @@ export default function CyberGamePage() {
   const difficulty = useGameStore((state) => state.difficulty);
   const mode = useGameStore((state) => state.mode);
   const playerNumber = useGameStore((state) => state.playerNumber);
+  const multiplayerGameInfo = useGameStore((state) => state.multiplayerGameInfo);
   const setCountdown = useGameStore((state) => state.setCountdown);
   const setMaxScore = useGameStore((state) => state.setMaxScore);
   const resetGame = useGameStore((state) => state.resetGame);
 
   const settings = useSettingsStore((state) => state.settings);
+
+  // Is this a multiplayer game in active play?
+  const isMultiplayerGame = mode === 'multiplayer' && multiplayerGameInfo?.gameId;
+  const isInMultiplayerGameplay = isMultiplayerGame && ['countdown', 'playing', 'paused', 'goal', 'gameover'].includes(pageState);
+
+  // Debug: Log multiplayer state
+  console.log('[GamePage] State:', { mode, pageState, isMultiplayerGame, isInMultiplayerGameplay, gameId: multiplayerGameInfo?.gameId });
+
+  // Use the playerId stored in the game store (set when game was created/joined)
+  const playerId = multiplayerGameInfo?.playerId || '';
 
   // Sync maxScore with settings
   useEffect(() => {
@@ -69,34 +93,58 @@ export default function CyberGamePage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Initialize game engine
-  const { getBodies, resetPuck, movePaddle } = useGameEngine();
+  // ============================================================================
+  // AI Mode: Local Physics Engine
+  // ============================================================================
+  const aiEngine = useGameEngine();
+
+  // ============================================================================
+  // Multiplayer Mode: Server-Authoritative Engine
+  // ============================================================================
+  // IMPORTANT: Only connect when in active gameplay states, NOT during 'waiting' or 'ready'
+  // because WaitingForOpponentScreen and GameReadyScreen have their own useMultiplayerGame hooks.
+  // This prevents duplicate WebSocket connections with the same playerId causing "Player already in room" errors.
+  const shouldConnectMultiplayer = isMultiplayerGame && ['countdown', 'playing', 'paused', 'goal', 'gameover'].includes(pageState);
+  const multiplayerEngine = useMultiplayerGameEngine({
+    gameId: shouldConnectMultiplayer ? (multiplayerGameInfo?.gameId || '') : '',
+    playerId: shouldConnectMultiplayer ? playerId : '',
+  });
+
+  // ============================================================================
+  // Unified Interface - Select the appropriate engine
+  // ============================================================================
+  const getBodies = isInMultiplayerGameplay
+    ? multiplayerEngine.getBodies
+    : aiEngine.getBodies;
+
+  const movePaddle = isInMultiplayerGameplay
+    ? multiplayerEngine.movePaddle
+    : aiEngine.movePaddle;
 
   // Get puck for AI
   const getPuck = useCallback(() => {
-    const bodies = getBodies();
+    const bodies = aiEngine.getBodies();
     return bodies?.puck ?? null;
-  }, [getBodies]);
+  }, [aiEngine]);
 
   // Handle player movement
   const handlePlayerMove = useCallback(
     (x: number, y: number) => {
-      // In multiplayer, move the correct paddle based on player number
-      if (mode === 'multiplayer' && playerNumber) {
-        movePaddle(playerNumber === 1 ? 'player1' : 'player2', x, y);
-      } else {
-        movePaddle('player1', x, y);
-      }
-    },
-    [movePaddle, mode, playerNumber]
-  );
-
-  // Handle AI movement
-  const handleAIMove = useCallback(
-    (x: number, y: number) => {
-      movePaddle('player2', x, y);
+      // Always use 'player1' as paddleOwner because:
+      // - In AI mode: player controls paddle1
+      // - In Multiplayer: each player sees their own paddle as paddle1 (bottom of screen)
+      //   The coordinate transformation in useMultiplayerGameEngine handles the rest
+      movePaddle('player1', x, y);
     },
     [movePaddle]
+  );
+
+  // Handle AI movement (only for AI mode)
+  const handleAIMove = useCallback(
+    (x: number, y: number) => {
+      aiEngine.movePaddle('player2', x, y);
+    },
+    [aiEngine]
   );
 
   // Handle player input with stable canvas ref
@@ -106,16 +154,21 @@ export default function CyberGamePage() {
     enabled: status === 'playing',
   });
 
-  // Handle AI opponent (only for AI mode)
+  // Handle AI opponent (only for AI mode, not multiplayer)
   useAIOpponent({
-    enabled: status === 'playing' && mode === 'ai',
+    enabled: status === 'playing' && mode === 'ai' && !isInMultiplayerGameplay,
     difficulty,
     onMove: handleAIMove,
     getPuck,
   });
 
-  // Countdown timer
+  // Countdown timer (only for AI mode - multiplayer gets countdown from server)
   useEffect(() => {
+    if (isInMultiplayerGameplay) {
+      // Server handles countdown in multiplayer
+      return;
+    }
+
     if (status === 'countdown' && countdown > 0) {
       const timer = setTimeout(() => {
         setCountdown(countdown - 1);
@@ -127,7 +180,7 @@ export default function CyberGamePage() {
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [status, countdown, setCountdown]);
+  }, [status, countdown, setCountdown, isInMultiplayerGameplay]);
 
   // Determine what to show based on pageState
   const showScoreboard = ['playing', 'paused', 'goal'].includes(status);
@@ -200,6 +253,25 @@ export default function CyberGamePage() {
                 {/* Game HUD with canvas */}
                 <GameHUD>
                   <GameCanvas ref={gameCanvasRef} getBodies={getBodies} />
+
+                  {/* Multiplayer pause overlay */}
+                  {isInMultiplayerGameplay && (
+                    <MultiplayerPauseOverlay
+                      pauseState={multiplayerEngine.pauseState}
+                      playerNumber={playerNumber}
+                      onResume={multiplayerEngine.sendResumeRequest}
+                      onQuit={multiplayerEngine.sendQuitGame}
+                    />
+                  )}
+
+                  {/* Opponent quit modal */}
+                  {isInMultiplayerGameplay && (
+                    <OpponentQuitModal
+                      opponentQuit={multiplayerEngine.opponentQuit}
+                      playerNumber={playerNumber}
+                      onContinue={resetGame}
+                    />
+                  )}
                 </GameHUD>
               </div>
             </div>

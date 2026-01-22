@@ -12,7 +12,7 @@ import { cyberTheme } from '@/lib/cyber/theme';
 import { useDynamicWallet } from '@/hooks/useDynamicWallet';
 import { useLineraGame } from '@/hooks/useLineraGame';
 import { useGameStore } from '@/stores/gameStore';
-import { useWebSocket } from '@/hooks/useWebSocket';
+import { useMultiplayerContext } from '@/contexts/MultiplayerContext';
 import { isValidGameId, normalizeGameId } from '@/lib/cyber/gameId';
 import { Modal } from '../ui/Modal';
 import { CyberButton } from '../ui/CyberButton';
@@ -28,6 +28,9 @@ export function JoinGameModal({ isOpen, onClose }: JoinGameModalProps) {
   const [gameIdInput, setGameIdInput] = useState('');
   const [state, setState] = useState<JoinState>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [shouldConnect, setShouldConnect] = useState(false);
+  const [actualGameId, setActualGameId] = useState<string>('');
+  const [roomCode, setRoomCode] = useState<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { address, shortAddress } = useDynamicWallet();
@@ -35,17 +38,27 @@ export function JoinGameModal({ isOpen, onClose }: JoinGameModalProps) {
   const joinMultiplayerGame = useGameStore((s) => s.joinMultiplayerGame);
   const setRoomId = useGameStore((s) => s.setRoomId);
 
-  // WebSocket connection
+  const normalizedGameId = normalizeGameId(gameIdInput);
+  // Append "-joiner" to distinguish from creator even if same wallet is used (testing on same machine)
+  const playerId = `${address || `player-${Date.now()}`}-joiner`;
+
+  // Shared WebSocket connection from context
   const {
-    isConnected: wsConnected,
-    roomId,
-    error: wsError,
+    isConnected,
+    isConnecting,
+    connectionError,
+    playerNumber,
+    opponentJoined,
     connect,
-    joinRoom,
     disconnect,
-  } = useWebSocket({
-    autoConnect: false, // We'll connect manually when needed
-  });
+  } = useMultiplayerContext();
+
+  // Connect when shouldConnect becomes true
+  useEffect(() => {
+    if (shouldConnect && actualGameId && playerId) {
+      connect(actualGameId, playerId);
+    }
+  }, [shouldConnect, actualGameId, playerId, connect]);
 
   // Focus input when modal opens
   useEffect(() => {
@@ -54,28 +67,17 @@ export function JoinGameModal({ isOpen, onClose }: JoinGameModalProps) {
     }
   }, [isOpen]);
 
-  // Handle WebSocket connection success - join room
+  // Handle successful room join
   useEffect(() => {
-    if (state === 'connecting' && wsConnected && gameIdInput) {
-      const normalizedId = normalizeGameId(gameIdInput);
-      console.log('[JoinGameModal] WebSocket connected, joining room:', normalizedId);
-      joinRoom(normalizedId);
-    }
-  }, [state, wsConnected, gameIdInput, joinRoom]);
-
-  // Handle room joined success
-  useEffect(() => {
-    if (state === 'connecting' && roomId) {
-      console.log('[JoinGameModal] Successfully joined room:', roomId);
+    if (state === 'connecting' && isConnected && playerNumber) {
+      console.log('[JoinGameModal] Successfully joined room, player:', playerNumber);
 
       // For now, simulate getting creator wallet from "blockchain"
-      // In real implementation, this would be fetched from the blockchain
       const mockCreatorWallet = '0x' + '1'.repeat(40);
-      const normalizedId = normalizeGameId(gameIdInput);
 
-      // Update store with joined game
-      joinMultiplayerGame(normalizedId, mockCreatorWallet, address!);
-      setRoomId(normalizedId);
+      // Update store with joined game (use actualGameId for API, roomCode for display, playerId for WebSocket)
+      joinMultiplayerGame(actualGameId, roomCode, mockCreatorWallet, address!, playerId);
+      setRoomId(actualGameId);
 
       setState('success');
 
@@ -85,15 +87,15 @@ export function JoinGameModal({ isOpen, onClose }: JoinGameModalProps) {
         resetState();
       }, 500);
     }
-  }, [state, roomId, gameIdInput, address, joinMultiplayerGame, setRoomId, onClose]);
+  }, [state, isConnected, playerNumber, actualGameId, roomCode, address, joinMultiplayerGame, setRoomId, onClose]);
 
   // Handle WebSocket errors
   useEffect(() => {
-    if (wsError && state === 'connecting') {
+    if (connectionError && state === 'connecting') {
       setState('error');
-      setError(wsError);
+      setError(connectionError);
     }
-  }, [wsError, state]);
+  }, [connectionError, state]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Auto-format as user types
@@ -114,7 +116,7 @@ export function JoinGameModal({ isOpen, onClose }: JoinGameModalProps) {
     setState('validating');
     setError(null);
 
-    // Validate Game ID
+    // Validate Game ID (user enters roomCode)
     const normalizedId = normalizeGameId(gameIdInput);
     if (!isValidGameId(normalizedId)) {
       setState('error');
@@ -125,12 +127,16 @@ export function JoinGameModal({ isOpen, onClose }: JoinGameModalProps) {
     setState('joining');
 
     try {
-      // Join game on Linera blockchain
-      await joinGame(normalizedId);
+      // Join game on Linera blockchain (returns actual gameId)
+      const result = await joinGame(normalizedId);
 
-      // Connect to WebSocket
+      // Store both the actual gameId and the roomCode
+      setActualGameId(result.gameId);
+      setRoomCode(result.game.roomCode || normalizedId);
+
+      // Start WebSocket connection
       setState('connecting');
-      connect();
+      setShouldConnect(true);
 
     } catch (err) {
       console.error('[JoinGameModal] Error:', err);
@@ -152,13 +158,16 @@ export function JoinGameModal({ isOpen, onClose }: JoinGameModalProps) {
     setState('idle');
     setError(null);
     setGameIdInput('');
+    setShouldConnect(false);
+    setActualGameId('');
+    setRoomCode('');
   };
 
   const handleClose = () => {
     if (state === 'joining' || state === 'connecting') return;
 
     // Disconnect WebSocket if we started connecting
-    if (wsConnected) {
+    if (shouldConnect) {
       disconnect();
     }
 

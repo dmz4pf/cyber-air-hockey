@@ -25,6 +25,7 @@ export class PhysicsEngine {
   private paddle1PrevPos: { x: number; y: number } | null = null;
   private paddle2PrevPos: { x: number; y: number } | null = null;
   private lastTickTime: number = Date.now();
+  private isPaused: boolean = false;
 
   constructor() {
     // Create Matter.js engine with zero gravity (air hockey table)
@@ -75,6 +76,41 @@ export class PhysicsEngine {
       clearInterval(this.tickInterval);
       this.tickInterval = null;
     }
+  }
+
+  /**
+   * Pause the physics engine without destroying state
+   * Returns the current game state for storage
+   */
+  pause(): GameState {
+    if (this.isPaused) {
+      return this.getState();
+    }
+
+    this.isPaused = true;
+    this.stop(); // Stop tick interval but preserve all state
+
+    return this.getState();
+  }
+
+  /**
+   * Resume the physics engine from paused state
+   */
+  resume(): void {
+    if (!this.isPaused) {
+      return;
+    }
+
+    this.isPaused = false;
+    this.lastTickTime = Date.now(); // Reset timing to prevent huge delta
+    this.start(); // Restart tick interval
+  }
+
+  /**
+   * Check if the engine is currently paused
+   */
+  isEnginePaused(): boolean {
+    return this.isPaused;
   }
 
   /**
@@ -225,6 +261,15 @@ export class PhysicsEngine {
 
     // Cap puck speed AFTER physics too (collision can exceed max)
     this.capPuckSpeed();
+
+    // Validate puck state and recover if needed (Layer 2 & 3 of defense-in-depth)
+    if (this.validateAndRecoverPuckState()) {
+      // Puck was reset due to invalid state, skip goal check this frame
+      return;
+    }
+
+    // Maintain minimum speed to prevent tediously slow gameplay
+    this.maintainMinimumSpeed();
 
     // Check for goals (only if not already processing a goal)
     if (!this.goalScored) {
@@ -467,9 +512,24 @@ export class PhysicsEngine {
    */
   private capPuckSpeed(): void {
     const velocity = this.puck.velocity;
+
+    // Check for NaN/Infinity in velocity (critical safety check)
+    if (!Number.isFinite(velocity.x) || !Number.isFinite(velocity.y)) {
+      console.warn('[Physics] Invalid puck velocity detected in capPuckSpeed, resetting to zero');
+      Matter.Body.setVelocity(this.puck, { x: 0, y: 0 });
+      return;
+    }
+
     const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
 
-    if (speed > PHYSICS_CONFIG.puck.maxSpeed) {
+    // Check for NaN speed (defensive check)
+    if (!Number.isFinite(speed)) {
+      console.warn('[Physics] Invalid puck speed calculated, resetting velocity');
+      Matter.Body.setVelocity(this.puck, { x: 0, y: 0 });
+      return;
+    }
+
+    if (speed > PHYSICS_CONFIG.puck.maxSpeed && speed > 0) {
       const scale = PHYSICS_CONFIG.puck.maxSpeed / speed;
       Matter.Body.setVelocity(this.puck, {
         x: velocity.x * scale,
@@ -487,15 +547,149 @@ export class PhysicsEngine {
         const { bodyA, bodyB } = pair;
 
         // Check if collision involves puck and paddle
-        const isPuckPaddleCollision =
-          (bodyA.label === 'puck' && bodyB.label === 'paddle') ||
-          (bodyA.label === 'paddle' && bodyB.label === 'puck');
+        const isPuck = (body: Matter.Body) => body.label === 'puck';
+        const isPaddle = (body: Matter.Body) => body.label === 'paddle';
 
-        if (isPuckPaddleCollision) {
-          // The collision response is handled by Matter.js physics
-          // We could add additional effects here (sound, visual feedback, etc.)
+        if ((isPuck(bodyA) && isPaddle(bodyB)) || (isPaddle(bodyA) && isPuck(bodyB))) {
+          const puck = isPuck(bodyA) ? bodyA : bodyB;
+          const paddle = isPaddle(bodyA) ? bodyA : bodyB;
+          this.handlePaddlePuckCollision(puck, paddle);
         }
       }
     });
+  }
+
+  /**
+   * Handle paddle-puck collision with velocity transfer
+   * The faster the paddle is moving, the faster the puck goes
+   */
+  private handlePaddlePuckCollision(puck: Matter.Body, paddle: Matter.Body): void {
+    // Calculate collision normal (from paddle center to puck center)
+    const dx = puck.position.x - paddle.position.x;
+    const dy = puck.position.y - paddle.position.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    // Minimum safe distance to prevent division issues (0.1 pixel)
+    const EPSILON = 0.1;
+
+    let normalX: number;
+    let normalY: number;
+
+    if (distance < EPSILON) {
+      // Objects are nearly overlapping - push puck away from paddle
+      // Use paddle's position to determine direction (toward opponent's side)
+      normalX = 0;
+      normalY = paddle.position.y > 0 ? -1 : 1;
+    } else {
+      normalX = dx / distance;
+      normalY = dy / distance;
+    }
+
+    // Validate normals are finite (catch any remaining edge cases)
+    if (!Number.isFinite(normalX) || !Number.isFinite(normalY)) {
+      console.warn('[Physics] Invalid collision normal, skipping velocity transfer');
+      return;
+    }
+
+    // Get paddle velocity (how fast the paddle was moving)
+    const paddleVelX = paddle.velocity.x;
+    const paddleVelY = paddle.velocity.y;
+
+    // Validate paddle velocity
+    if (!Number.isFinite(paddleVelX) || !Number.isFinite(paddleVelY)) {
+      console.warn('[Physics] Invalid paddle velocity, skipping velocity transfer');
+      return;
+    }
+
+    const paddleSpeed = Math.sqrt(paddleVelX * paddleVelX + paddleVelY * paddleVelY);
+
+    // Apply velocity transfer: paddle speed contributes to puck velocity
+    const transferAmount = paddleSpeed * PHYSICS_CONFIG.paddle.velocityTransfer;
+
+    // Calculate new velocity
+    const newVx = puck.velocity.x + normalX * transferAmount;
+    const newVy = puck.velocity.y + normalY * transferAmount;
+
+    // Final validation before applying
+    if (!Number.isFinite(newVx) || !Number.isFinite(newVy)) {
+      console.warn('[Physics] Invalid new velocity calculated, skipping');
+      return;
+    }
+
+    // Apply the new velocity (capPuckSpeed will clamp it in the next tick)
+    Matter.Body.setVelocity(puck, { x: newVx, y: newVy });
+  }
+
+  /**
+   * Maintain minimum puck speed to prevent tediously slow gameplay
+   */
+  private maintainMinimumSpeed(): void {
+    const velocity = this.puck.velocity;
+
+    // Skip if velocity is invalid (capPuckSpeed handles the reset)
+    if (!Number.isFinite(velocity.x) || !Number.isFinite(velocity.y)) {
+      return;
+    }
+
+    const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
+    const minSpeed = PHYSICS_CONFIG.puck.minSpeed;
+
+    // Only apply if puck is moving but below minimum (don't accelerate a stationary puck)
+    // Also ensure speed is valid and non-zero to prevent division issues
+    if (Number.isFinite(speed) && speed > 0.1 && speed < minSpeed) {
+      const scale = minSpeed / speed;
+      Matter.Body.setVelocity(this.puck, {
+        x: velocity.x * scale,
+        y: velocity.y * scale,
+      });
+    }
+  }
+
+  /**
+   * Validate puck state and reset if invalid or out of bounds
+   * Returns true if puck was reset
+   */
+  private validateAndRecoverPuckState(): boolean {
+    const pos = this.puck.position;
+    const vel = this.puck.velocity;
+
+    // Check for NaN/Infinity in position or velocity
+    const positionInvalid = !Number.isFinite(pos.x) || !Number.isFinite(pos.y);
+    const velocityInvalid = !Number.isFinite(vel.x) || !Number.isFinite(vel.y);
+
+    if (positionInvalid || velocityInvalid) {
+      console.error('[Physics] CRITICAL: Puck state invalid, resetting to center', {
+        position: { x: pos.x, y: pos.y },
+        velocity: { x: vel.x, y: vel.y }
+      });
+      this.resetPuck();
+      return true;
+    }
+
+    // Check for out-of-bounds (puck escaped the table somehow)
+    const halfWidth = PHYSICS_CONFIG.table.width / 2;
+    const halfHeight = PHYSICS_CONFIG.table.height / 2;
+    const margin = PHYSICS_CONFIG.puck.radius * 3; // Allow some overshoot for goal detection
+
+    const outOfBoundsX = Math.abs(pos.x) > halfWidth + margin;
+    const outOfBoundsY = Math.abs(pos.y) > halfHeight + margin;
+
+    // Only reset if way out of bounds and not in goal area
+    if (outOfBoundsX || outOfBoundsY) {
+      // Check if this is a legitimate goal (within goal width, past table edge)
+      const inGoalX = Math.abs(pos.x) <= PHYSICS_CONFIG.table.goalWidth / 2;
+      const pastGoalLine = Math.abs(pos.y) > halfHeight + PHYSICS_CONFIG.puck.radius;
+
+      if (!(inGoalX && pastGoalLine)) {
+        // Not a goal, puck escaped - reset it
+        console.error('[Physics] CRITICAL: Puck escaped bounds, resetting to center', {
+          position: { x: pos.x, y: pos.y }
+        });
+        this.resetPuck();
+        return true;
+      }
+    }
+
+    return false;
   }
 }

@@ -12,7 +12,8 @@ import type {
 } from '@/types/websocket';
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080';
-const RECONNECT_DELAY = 2000;
+const RECONNECT_BASE_DELAY = 1000; // Start with 1s delay
+const RECONNECT_MAX_DELAY = 10000; // Cap at 10s
 const PING_INTERVAL = 15000; // Ping every 15s to keep Render awake (free tier sleeps after 15min)
 const MAX_RECONNECT_ATTEMPTS = 10; // More attempts for free tier servers
 const CONNECTION_TIMEOUT = 10000; // 10s timeout for initial connection
@@ -275,15 +276,24 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         connectionStatus: 'disconnected',
       }));
 
-      // Attempt reconnection
+      // Attempt reconnection with exponential backoff and jitter
       if (reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
         reconnectAttemptsRef.current++;
         setState(s => ({ ...s, connectionStatus: 'reconnecting' }));
 
+        // Exponential backoff: 1s, 2s, 4s, 8s, 10s (capped)
+        const baseDelay = Math.min(
+          RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttemptsRef.current - 1),
+          RECONNECT_MAX_DELAY
+        );
+        // Add 0-30% jitter to prevent thundering herd
+        const jitter = Math.random() * 0.3 * baseDelay;
+        const delay = baseDelay + jitter;
+
         reconnectTimeoutRef.current = setTimeout(() => {
-          console.log(`Reconnecting (attempt ${reconnectAttemptsRef.current})...`);
+          console.log(`[WebSocket] Reconnecting (attempt ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS})...`);
           connect();
-        }, RECONNECT_DELAY);
+        }, delay);
       } else {
         setState(s => ({
           ...s,

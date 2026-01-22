@@ -1,7 +1,8 @@
 import { WebSocket } from 'ws';
-import { roomManager } from '../websocket/room-manager';
+import { roomManager, type PauseState } from '../websocket/room-manager';
 import { PhysicsEngine } from '../physics/engine';
 import { PHYSICS_CONFIG } from '../physics/config';
+import type { PauseReason, Score } from '../websocket/message-types';
 import lineraQueue from './linera-queue';
 
 export class GameServer {
@@ -9,6 +10,18 @@ export class GameServer {
   private startingGames: Set<string> = new Set();
   private endingGames: Set<string> = new Set();
   private countdownIntervals: Map<string, NodeJS.Timeout> = new Map();
+  // Track current countdown value for reconnecting players
+  private countdownValues: Map<string, number> = new Map();
+  // Grace period for reconnection (prevents instant forfeit on screen transitions)
+  private disconnectTimeouts: Map<string, NodeJS.Timeout> = new Map();
+  private readonly RECONNECT_GRACE_MS = 5000; // 5 seconds to reconnect
+  // Resume countdown intervals
+  private resumeCountdownIntervals: Map<string, NodeJS.Timeout> = new Map();
+  // Pause rate limiting (1 pause per 5 seconds per player)
+  private lastPauseTime: Map<string, number> = new Map();
+  private readonly PAUSE_COOLDOWN_MS = 5000;
+  // Disconnect grace period for pause-on-disconnect
+  private readonly DISCONNECT_GRACE_PERIOD_MS = 30000; // 30 seconds
 
   async handleJoinRoom(ws: WebSocket, gameId: string, playerId: string): Promise<void> {
     // 1. Check if room exists, if not create it
@@ -28,11 +41,74 @@ export class GameServer {
       return;
     }
 
+    // Cancel any pending disconnect timeout for this player (they reconnected)
+    const timeoutKey = `${gameId}:${playerId}`;
+    const pendingTimeout = this.disconnectTimeouts.get(timeoutKey);
+    if (pendingTimeout) {
+      console.log(`[GameServer] Player ${playerId} reconnected, cancelling disconnect timeout`);
+      clearTimeout(pendingTimeout);
+      this.disconnectTimeouts.delete(timeoutKey);
+    }
+
     // 3. Send room-joined to this player
     try {
       ws.send(JSON.stringify({ type: 'room-joined', gameId, playerNumber: result.playerNumber }));
     } catch (error) {
       console.error('[GameServer] Failed to send room-joined:', error);
+    }
+
+    // 3.5. If game is already in progress (reconnection scenario), send current state
+    if (room.state === 'countdown') {
+      // Send opponent-joined and current countdown value
+      const currentCountdown = this.countdownValues.get(gameId);
+      try {
+        ws.send(JSON.stringify({ type: 'opponent-joined', opponentId: 'opponent' }));
+        if (currentCountdown !== undefined) {
+          ws.send(JSON.stringify({ type: 'countdown', seconds: currentCountdown }));
+        }
+      } catch (error) {
+        console.error('[GameServer] Failed to send countdown state on reconnect:', error);
+      }
+      console.log(`[GameServer] Player ${playerId} reconnected during countdown, sent current state (${currentCountdown}s)`);
+    } else if (room.state === 'playing' && room.physicsEngine) {
+      // Send current game state immediately so they can catch up
+      const state = room.physicsEngine.getState();
+      try {
+        ws.send(JSON.stringify({ type: 'opponent-joined', opponentId: 'opponent' }));
+        ws.send(JSON.stringify({ type: 'state-update', ...state }));
+      } catch (error) {
+        console.error('[GameServer] Failed to send state on reconnect:', error);
+      }
+      console.log(`[GameServer] Player ${playerId} reconnected during playing, sent current state`);
+    } else if ((room.state === 'paused' || room.state === 'resuming') && room.pauseState) {
+      // Player reconnected during pause - send current pause state
+      const state = room.pauseState.savedGameState;
+      try {
+        ws.send(JSON.stringify({ type: 'opponent-joined', opponentId: 'opponent' }));
+        ws.send(JSON.stringify({ type: 'state-update', ...state }));
+        ws.send(JSON.stringify({
+          type: 'game-paused',
+          reason: room.pauseState.reason,
+          pausedBy: room.pauseState.pausedBy,
+          canResume: true, // They can now resume since they reconnected
+          gracePeriodMs: room.pauseState.disconnectedPlayerId ? this.DISCONNECT_GRACE_PERIOD_MS : undefined
+        }));
+      } catch (error) {
+        console.error('[GameServer] Failed to send pause state on reconnect:', error);
+      }
+      console.log(`[GameServer] Player ${playerId} reconnected during ${room.state}, sent current state`);
+
+      // If this was the disconnected player, update pause state to allow resume
+      if (room.pauseState.disconnectedPlayerId === playerId) {
+        console.log(`[GameServer] Disconnected player ${playerId} reconnected - game can now resume`);
+        // Update canResume for both players
+        roomManager.broadcast(gameId, {
+          type: 'game-paused',
+          reason: room.pauseState.reason,
+          pausedBy: room.pauseState.pausedBy,
+          canResume: true
+        });
+      }
     }
 
     // 4. If 2 players now, notify both and start countdown
@@ -61,35 +137,375 @@ export class GameServer {
     // Could track ready state if needed
   }
 
-  handleDisconnect(gameId: string, playerId: string): void {
+  /**
+   * Handle pause request from a player
+   */
+  handlePauseRequest(ws: WebSocket): void {
+    const roomInfo = roomManager.getRoomByWebSocket(ws);
+    if (!roomInfo) return;
+
+    const { gameId, playerId } = roomInfo;
     const room = roomManager.getRoom(gameId);
+    if (!room) return;
 
-    if (room) {
-      if (room.state === 'playing') {
-        // Forfeit - other player wins
-        const otherPlayer = Array.from(room.players.entries()).find(([id]) => id !== playerId);
-        if (otherPlayer) {
-          const winner = otherPlayer[1].playerNumber;
-          const state = room.physicsEngine?.getState();
-          this.endGame(gameId, winner, state?.score || { player1: 0, player2: 0 });
-        }
-      } else if (room.state === 'countdown') {
-        // Cancel countdown and notify remaining player
-        const interval = this.countdownIntervals.get(gameId);
-        if (interval) {
-          clearInterval(interval);
-          this.countdownIntervals.delete(gameId);
-        }
-        roomManager.setRoomState(gameId, 'waiting');
-        this.startingGames.delete(gameId);
+    // Only allow pause during playing state
+    if (room.state !== 'playing') {
+      console.log(`[GameServer] Pause request ignored - game not playing (state: ${room.state})`);
+      return;
+    }
 
-        // Notify remaining player that opponent disconnected
-        roomManager.broadcast(gameId, {
-          type: 'opponent-disconnected'
-        });
+    // Rate limit: check cooldown
+    const pauseKey = `${gameId}:${playerId}`;
+    const lastPause = this.lastPauseTime.get(pauseKey);
+    const now = Date.now();
+    if (lastPause && now - lastPause < this.PAUSE_COOLDOWN_MS) {
+      console.log(`[GameServer] Pause request rate limited for player ${playerId}`);
+      return;
+    }
+    this.lastPauseTime.set(pauseKey, now);
+
+    // Get player number for the pause message
+    const player = room.players.get(playerId);
+    if (!player) return;
+
+    this.pauseGame(gameId, 'player_pause', player.playerNumber);
+  }
+
+  /**
+   * Handle resume request from a player
+   */
+  handleResumeRequest(ws: WebSocket): void {
+    const roomInfo = roomManager.getRoomByWebSocket(ws);
+    if (!roomInfo) return;
+
+    const { gameId } = roomInfo;
+    const room = roomManager.getRoom(gameId);
+    if (!room) return;
+
+    // Only allow resume during paused state
+    if (room.state !== 'paused') {
+      console.log(`[GameServer] Resume request ignored - game not paused (state: ${room.state})`);
+      return;
+    }
+
+    // Don't allow resume if paused due to disconnect and player hasn't reconnected
+    if (room.pauseState?.reason === 'opponent_disconnected' && room.pauseState.disconnectedPlayerId) {
+      const disconnectedPlayer = room.players.get(room.pauseState.disconnectedPlayerId);
+      if (!disconnectedPlayer || disconnectedPlayer.ws.readyState !== 1) {
+        console.log(`[GameServer] Resume request ignored - disconnected player hasn't reconnected`);
+        return;
       }
     }
 
+    this.startResumeCountdown(gameId);
+  }
+
+  /**
+   * Handle quit request from a player
+   */
+  handleQuitGame(ws: WebSocket): void {
+    const roomInfo = roomManager.getRoomByWebSocket(ws);
+    if (!roomInfo) return;
+
+    const { gameId, playerId } = roomInfo;
+    const room = roomManager.getRoom(gameId);
+    if (!room) return;
+
+    // Get the quitting player's number
+    const quittingPlayer = room.players.get(playerId);
+    if (!quittingPlayer) return;
+
+    // Determine winner (opponent of quitting player)
+    const winner: 1 | 2 = quittingPlayer.playerNumber === 1 ? 2 : 1;
+
+    // Get current score or default
+    const score = room.physicsEngine?.getState().score || { player1: 0, player2: 0 };
+
+    console.log(`[GameServer] Player ${playerId} (P${quittingPlayer.playerNumber}) quit game ${gameId}`);
+
+    // Stop physics and intervals
+    room.physicsEngine?.stop();
+    if (room.broadcastInterval) {
+      clearInterval(room.broadcastInterval);
+      room.broadcastInterval = null;
+    }
+
+    // Clear any pause-related state
+    this.clearPauseState(gameId);
+
+    // Mark room as ended
+    roomManager.setRoomState(gameId, 'ended');
+
+    // Notify all players that opponent quit
+    roomManager.broadcast(gameId, {
+      type: 'opponent-quit',
+      winner,
+      finalScore: score
+    });
+
+    // Clean up state locks
+    this.startingGames.delete(gameId);
+    this.endingGames.delete(gameId);
+  }
+
+  /**
+   * Pause the game (internal method)
+   */
+  private pauseGame(gameId: string, reason: PauseReason, pausedBy: 1 | 2 | null, disconnectedPlayerId?: string): void {
+    const room = roomManager.getRoom(gameId);
+    if (!room || !room.physicsEngine) return;
+
+    console.log(`[GameServer] Pausing game ${gameId} - reason: ${reason}, by: P${pausedBy}`);
+
+    // Stop broadcast interval (preserves physics state)
+    if (room.broadcastInterval) {
+      clearInterval(room.broadcastInterval);
+      room.broadcastInterval = null;
+    }
+
+    // Pause physics engine
+    const savedState = room.physicsEngine.pause();
+
+    // Store pause state
+    room.pauseState = {
+      reason,
+      pausedBy,
+      pausedAt: Date.now(),
+      disconnectedPlayerId,
+      savedGameState: savedState
+    };
+
+    // Set room state to paused
+    roomManager.setRoomState(gameId, 'paused');
+
+    // Determine if can resume (not if disconnected player hasn't reconnected)
+    const canResume = reason !== 'opponent_disconnected';
+    const gracePeriodMs = reason === 'opponent_disconnected' ? this.DISCONNECT_GRACE_PERIOD_MS : undefined;
+
+    // Broadcast pause to all players
+    roomManager.broadcast(gameId, {
+      type: 'game-paused',
+      reason,
+      pausedBy,
+      canResume,
+      gracePeriodMs
+    });
+  }
+
+  /**
+   * Start the resume countdown (3-2-1 then resume)
+   */
+  private startResumeCountdown(gameId: string): void {
+    const room = roomManager.getRoom(gameId);
+    if (!room) return;
+
+    // Cancel any existing resume countdown
+    const existingInterval = this.resumeCountdownIntervals.get(gameId);
+    if (existingInterval) {
+      clearInterval(existingInterval);
+    }
+
+    roomManager.setRoomState(gameId, 'resuming');
+    let seconds = 3;
+
+    console.log(`[GameServer] Starting resume countdown for game ${gameId}`);
+
+    // Send initial countdown
+    roomManager.broadcast(gameId, { type: 'resume-countdown', seconds });
+
+    const interval = setInterval(() => {
+      seconds--;
+
+      if (seconds > 0) {
+        roomManager.broadcast(gameId, { type: 'resume-countdown', seconds });
+      } else {
+        clearInterval(interval);
+        this.resumeCountdownIntervals.delete(gameId);
+        this.resumeGame(gameId);
+      }
+    }, 1000);
+
+    this.resumeCountdownIntervals.set(gameId, interval);
+  }
+
+  /**
+   * Resume the game after countdown
+   */
+  private resumeGame(gameId: string): void {
+    const room = roomManager.getRoom(gameId);
+    if (!room || !room.physicsEngine) return;
+
+    console.log(`[GameServer] Resuming game ${gameId}`);
+
+    // Resume physics
+    room.physicsEngine.resume();
+
+    // Clear pause state
+    room.pauseState = null;
+
+    // Set room state back to playing
+    roomManager.setRoomState(gameId, 'playing');
+
+    // Restart broadcast loop
+    const broadcastMs = 1000 / PHYSICS_CONFIG.game.broadcastRate;
+    room.broadcastInterval = setInterval(() => {
+      const state = room.physicsEngine!.getState();
+      roomManager.broadcast(gameId, { type: 'state-update', ...state });
+    }, broadcastMs);
+
+    // Notify players game resumed
+    roomManager.broadcast(gameId, { type: 'game-resumed' });
+  }
+
+  /**
+   * Clear all pause-related state for a game
+   */
+  private clearPauseState(gameId: string): void {
+    // Clear resume countdown if running
+    const resumeInterval = this.resumeCountdownIntervals.get(gameId);
+    if (resumeInterval) {
+      clearInterval(resumeInterval);
+      this.resumeCountdownIntervals.delete(gameId);
+    }
+
+    // Clear grace period timeout if any
+    const room = roomManager.getRoom(gameId);
+    if (room?.pauseState?.gracePeriodTimeout) {
+      clearTimeout(room.pauseState.gracePeriodTimeout);
+    }
+
+    // Clear pause state
+    if (room) {
+      room.pauseState = null;
+    }
+
+    // Clear pause rate limiting for this game
+    for (const [key] of this.lastPauseTime) {
+      if (key.startsWith(gameId)) {
+        this.lastPauseTime.delete(key);
+      }
+    }
+  }
+
+  handleDisconnect(gameId: string, playerId: string, disconnectedWs?: WebSocket): void {
+    const room = roomManager.getRoom(gameId);
+
+    if (!room) {
+      return;
+    }
+
+    // Check if the disconnected WebSocket is still the current one for this player
+    // If not, this is a stale disconnect from a previous connection (player reconnected)
+    const currentPlayer = room.players.get(playerId);
+    if (disconnectedWs && currentPlayer && currentPlayer.ws !== disconnectedWs) {
+      console.log(`[GameServer] Ignoring stale disconnect for player ${playerId} (already reconnected)`);
+      return;
+    }
+
+    const timeoutKey = `${gameId}:${playerId}`;
+
+    // Handle disconnect during active gameplay - PAUSE the game
+    if (room.state === 'playing') {
+      console.log(`[GameServer] Player ${playerId} disconnected during gameplay, pausing game`);
+
+      // Get disconnected player's number
+      const disconnectedPlayer = room.players.get(playerId);
+      const disconnectedPlayerNumber = disconnectedPlayer?.playerNumber || null;
+
+      // Pause the game with disconnect reason
+      this.pauseGame(gameId, 'opponent_disconnected', disconnectedPlayerNumber, playerId);
+
+      // Start grace period timeout for forfeit
+      const timeout = setTimeout(() => {
+        this.disconnectTimeouts.delete(timeoutKey);
+
+        const currentRoom = roomManager.getRoom(gameId);
+        if (!currentRoom) return;
+
+        // Check if player reconnected
+        const player = currentRoom.players.get(playerId);
+        if (player && player.ws !== disconnectedWs && player.ws.readyState === 1) {
+          console.log(`[GameServer] Player ${playerId} reconnected during grace period`);
+          return;
+        }
+
+        // Grace period expired - forfeit
+        console.log(`[GameServer] Disconnect grace period expired for player ${playerId}, forfeiting`);
+
+        const otherPlayer = Array.from(currentRoom.players.entries()).find(([id]) => id !== playerId);
+        if (otherPlayer) {
+          const winner = otherPlayer[1].playerNumber;
+          const score = currentRoom.pauseState?.savedGameState.score ||
+                       currentRoom.physicsEngine?.getState().score ||
+                       { player1: 0, player2: 0 };
+          this.endGame(gameId, winner, score);
+        }
+
+        roomManager.leaveRoom(gameId, playerId);
+      }, this.DISCONNECT_GRACE_PERIOD_MS);
+
+      this.disconnectTimeouts.set(timeoutKey, timeout);
+
+      // Store the timeout reference in pause state for cleanup
+      if (room.pauseState) {
+        room.pauseState.gracePeriodTimeout = timeout;
+      }
+
+      return;
+    }
+
+    // Handle disconnect during paused state - just update grace period
+    if (room.state === 'paused' || room.state === 'resuming') {
+      console.log(`[GameServer] Player ${playerId} disconnected during ${room.state}, maintaining pause`);
+      // Don't do anything - game is already paused
+      return;
+    }
+
+    // Handle disconnect during countdown or waiting - use short grace period
+    if (room.state === 'countdown' || room.state === 'waiting') {
+      console.log(`[GameServer] Player ${playerId} disconnected during ${room.state}, starting ${this.RECONNECT_GRACE_MS}ms grace period`);
+
+      const timeout = setTimeout(() => {
+        this.disconnectTimeouts.delete(timeoutKey);
+
+        const currentRoom = roomManager.getRoom(gameId);
+        if (!currentRoom) return;
+
+        // Check if player reconnected
+        const player = currentRoom.players.get(playerId);
+        if (player && player.ws !== disconnectedWs) {
+          console.log(`[GameServer] Player ${playerId} already reconnected, skipping disconnect handling`);
+          return;
+        }
+
+        console.log(`[GameServer] Grace period expired for player ${playerId}, processing disconnect`);
+
+        if (currentRoom.state === 'countdown') {
+          // Cancel countdown and notify remaining player
+          const interval = this.countdownIntervals.get(gameId);
+          if (interval) {
+            clearInterval(interval);
+            this.countdownIntervals.delete(gameId);
+          }
+          this.countdownValues.delete(gameId);
+          roomManager.setRoomState(gameId, 'waiting');
+          this.startingGames.delete(gameId);
+
+          // Notify remaining player that opponent disconnected
+          roomManager.broadcast(gameId, { type: 'opponent-disconnected' });
+        } else if (currentRoom.state === 'waiting') {
+          // Notify other player (if any) that opponent disconnected
+          roomManager.broadcast(gameId, { type: 'opponent-disconnected' }, playerId);
+        }
+
+        roomManager.leaveRoom(gameId, playerId);
+      }, this.RECONNECT_GRACE_MS);
+
+      this.disconnectTimeouts.set(timeoutKey, timeout);
+      return;
+    }
+
+    // For 'ended' state, disconnect immediately (no reconnection needed)
     roomManager.leaveRoom(gameId, playerId);
   }
 
@@ -100,21 +516,28 @@ export class GameServer {
     roomManager.setRoomState(gameId, 'countdown');
     let seconds = PHYSICS_CONFIG.game.countdownSeconds;
 
+    // Initialize countdown tracking
+    this.countdownValues.set(gameId, seconds);
+
     // Store interval for cleanup on disconnect
     const countdownInterval = setInterval(() => {
       const currentRoom = roomManager.getRoom(gameId);
       if (!currentRoom || currentRoom.state !== 'countdown') {
         clearInterval(countdownInterval);
         this.countdownIntervals.delete(gameId);
+        this.countdownValues.delete(gameId);
         return;
       }
 
+      // Update tracked value BEFORE broadcast so reconnecting players get current value
+      this.countdownValues.set(gameId, seconds);
       roomManager.broadcast(gameId, { type: 'countdown', seconds });
       seconds--;
 
       if (seconds < 0) {
         clearInterval(countdownInterval);
         this.countdownIntervals.delete(gameId);
+        this.countdownValues.delete(gameId);
         this.startGame(gameId);
       }
     }, 1000);
@@ -181,6 +604,7 @@ export class GameServer {
       clearInterval(countdownInterval);
       this.countdownIntervals.delete(gameId);
     }
+    this.countdownValues.delete(gameId);
 
     roomManager.setRoomState(gameId, 'ended');
     roomManager.broadcast(gameId, { type: 'game-over', winner, finalScore: score });
