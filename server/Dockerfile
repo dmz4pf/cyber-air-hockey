@@ -2,24 +2,33 @@
 # Multi-stage build for smaller final image
 
 # =============================================================================
-# Stage 1: Install Linera CLI
+# Stage 1: Install Linera CLI from source
 # =============================================================================
 FROM rust:1.86-bookworm AS linera-builder
 
 # Install dependencies for Linera
 RUN apt-get update && apt-get install -y \
     curl \
+    git \
     build-essential \
     pkg-config \
     libssl-dev \
     protobuf-compiler \
+    clang \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Linera CLI using the official install script
-RUN curl -sSL https://get.linera.io | sh
+# Clone and install Linera from GitHub
+WORKDIR /linera-build
+
+# Clone the testnet branch
+RUN git clone --depth 1 --branch testnet_babbage https://github.com/linera-io/linera-protocol.git .
+
+# Install linera binaries
+RUN cargo install --locked --path linera-service
+RUN cargo install --locked --path linera-storage-service
 
 # Verify installation
-RUN /root/.local/bin/linera --version
+RUN /root/.cargo/bin/linera --version
 
 # =============================================================================
 # Stage 2: Build Node.js application
@@ -55,8 +64,9 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy Linera binaries from builder
-COPY --from=linera-builder /root/.local/bin/linera /usr/local/bin/linera
-COPY --from=linera-builder /root/.local/bin/linera-* /usr/local/bin/
+COPY --from=linera-builder /root/.cargo/bin/linera /usr/local/bin/linera
+COPY --from=linera-builder /root/.cargo/bin/linera-server /usr/local/bin/linera-server
+COPY --from=linera-builder /root/.cargo/bin/linera-proxy /usr/local/bin/linera-proxy
 
 # Make sure linera is executable
 RUN chmod +x /usr/local/bin/linera*
@@ -77,7 +87,7 @@ ENV PORT=4000
 EXPOSE 4000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:4000/api/health || exit 1
 
 # Start the server

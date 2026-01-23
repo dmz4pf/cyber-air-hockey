@@ -3,6 +3,8 @@
 /**
  * AudioContext - React context for game audio
  * Provides audio controls throughout the app
+ *
+ * Note: Consider using the useAudio() hook from @/lib/audio for simpler usage
  */
 
 import React, {
@@ -14,23 +16,62 @@ import React, {
   useRef,
 } from 'react';
 import AudioManager from '@/lib/audio/AudioManager';
-import { AudioContextValue, MusicName } from '@/lib/audio/types';
+import { MusicName } from '@/lib/audio/types';
 import { useSettingsStore } from '@/stores/settingsStore';
+
+// Context value interface for backward compatibility
+interface AudioContextValue {
+  isInitialized: boolean;
+  isMuted: boolean;
+  currentMusic: MusicName | null;
+  initialize: () => Promise<void>;
+  toggleMute: () => void;
+  setMuted: (muted: boolean) => void;
+
+  // SFX (legacy API - maintained for backward compatibility)
+  playPaddleHit: () => void;
+  playWallBounce: () => void;
+  playGoalScored: () => void;
+  playCountdownBeep: () => void;
+  playCountdownGo: () => void;
+  playVictory: () => void;
+  playDefeat: () => void;
+  playButtonClick: () => void;
+
+  // New SFX API
+  playHit: (velocity: number) => void;
+  playGoal: (isPlayer: boolean) => void;
+  playClick: () => void;
+  playHover: () => void;
+
+  // Music
+  playMenuMusic: () => void;
+  playGameMusic: () => void;
+  playOvertimeMusic: () => void;
+  stopMusic: () => void;
+
+  // Ambient
+  playAmbient: () => void;
+  stopAmbient: () => void;
+}
 
 const AudioContext = createContext<AudioContextValue | null>(null);
 
-export function useAudio(): AudioContextValue {
+export function useAudioContext(): AudioContextValue {
   const context = useContext(AudioContext);
   if (!context) {
-    throw new Error('useAudio must be used within an AudioProvider');
+    throw new Error('useAudioContext must be used within an AudioProvider');
   }
   return context;
 }
 
 // Optional hook that doesn't throw if context is missing
-export function useAudioOptional(): AudioContextValue | null {
+export function useAudioContextOptional(): AudioContextValue | null {
   return useContext(AudioContext);
 }
+
+// Alias for backward compatibility
+export const useAudioOptional = useAudioContextOptional;
 
 interface AudioProviderProps {
   children: React.ReactNode;
@@ -49,7 +90,6 @@ export function AudioProvider({ children }: AudioProviderProps) {
 
   // Initialize audio manager
   const initialize = useCallback(async () => {
-    // Return existing promise if initialization is in progress
     if (initPromiseRef.current) {
       return initPromiseRef.current;
     }
@@ -72,15 +112,26 @@ export function AudioProvider({ children }: AudioProviderProps) {
     return initPromiseRef.current;
   }, []);
 
-  // Sync settings store to audio manager
+  // Auto-unlock on first interaction
   useEffect(() => {
-    const manager = audioManagerRef.current;
-    if (!manager) return;
+    const handleInteraction = async () => {
+      await initialize();
+      await audioManagerRef.current?.unlock();
+      document.removeEventListener('click', handleInteraction);
+      document.removeEventListener('touchstart', handleInteraction);
+      document.removeEventListener('keydown', handleInteraction);
+    };
 
-    manager.setMasterVolume(audioSettings.masterVolume / 100);
-    manager.setSFXVolume(audioSettings.sfxVolume / 100);
-    manager.setMusicVolume(audioSettings.musicVolume / 100);
-  }, [audioSettings]);
+    document.addEventListener('click', handleInteraction, { once: true });
+    document.addEventListener('touchstart', handleInteraction, { once: true });
+    document.addEventListener('keydown', handleInteraction, { once: true });
+
+    return () => {
+      document.removeEventListener('click', handleInteraction);
+      document.removeEventListener('touchstart', handleInteraction);
+      document.removeEventListener('keydown', handleInteraction);
+    };
+  }, [initialize]);
 
   // Handle tab visibility for music
   useEffect(() => {
@@ -125,10 +176,14 @@ export function AudioProvider({ children }: AudioProviderProps) {
     setIsMuted(muted);
   }, []);
 
-  // SFX methods - initialize on first use if needed
+  // ═══════════════════════════════════════════════════════════
+  // SFX - Legacy API (backward compatibility)
+  // ═══════════════════════════════════════════════════════════
+
   const playPaddleHit = useCallback(async () => {
     if (!audioManagerRef.current?.isInitialized()) await initialize();
-    audioManagerRef.current?.playPaddleHit();
+    // Use medium intensity for legacy API
+    audioManagerRef.current?.playHit(10);
   }, [initialize]);
 
   const playWallBounce = useCallback(async () => {
@@ -138,7 +193,7 @@ export function AudioProvider({ children }: AudioProviderProps) {
 
   const playGoalScored = useCallback(async () => {
     if (!audioManagerRef.current?.isInitialized()) await initialize();
-    audioManagerRef.current?.playGoalScored();
+    audioManagerRef.current?.playGoal(true);
   }, [initialize]);
 
   const playCountdownBeep = useCallback(async () => {
@@ -163,10 +218,43 @@ export function AudioProvider({ children }: AudioProviderProps) {
 
   const playButtonClick = useCallback(async () => {
     if (!audioManagerRef.current?.isInitialized()) await initialize();
-    audioManagerRef.current?.playButtonClick();
+    audioManagerRef.current?.playClick();
   }, [initialize]);
 
-  // Music methods
+  // ═══════════════════════════════════════════════════════════
+  // SFX - New API
+  // ═══════════════════════════════════════════════════════════
+
+  const playHit = useCallback(
+    async (velocity: number) => {
+      if (!audioManagerRef.current?.isInitialized()) await initialize();
+      audioManagerRef.current?.playHit(velocity);
+    },
+    [initialize]
+  );
+
+  const playGoal = useCallback(
+    async (isPlayer: boolean) => {
+      if (!audioManagerRef.current?.isInitialized()) await initialize();
+      audioManagerRef.current?.playGoal(isPlayer);
+    },
+    [initialize]
+  );
+
+  const playClick = useCallback(async () => {
+    if (!audioManagerRef.current?.isInitialized()) await initialize();
+    audioManagerRef.current?.playClick();
+  }, [initialize]);
+
+  const playHover = useCallback(async () => {
+    if (!audioManagerRef.current?.isInitialized()) await initialize();
+    audioManagerRef.current?.playHover();
+  }, [initialize]);
+
+  // ═══════════════════════════════════════════════════════════
+  // Music
+  // ═══════════════════════════════════════════════════════════
+
   const playMenuMusic = useCallback(async () => {
     if (!audioManagerRef.current?.isInitialized()) await initialize();
     audioManagerRef.current?.playMusic('menu');
@@ -179,9 +267,28 @@ export function AudioProvider({ children }: AudioProviderProps) {
     setCurrentMusic('gameplay');
   }, [initialize]);
 
+  const playOvertimeMusic = useCallback(async () => {
+    if (!audioManagerRef.current?.isInitialized()) await initialize();
+    audioManagerRef.current?.fadeToTrack('overtime');
+    setCurrentMusic('overtime');
+  }, [initialize]);
+
   const stopMusic = useCallback(() => {
     audioManagerRef.current?.stopMusic();
     setCurrentMusic(null);
+  }, []);
+
+  // ═══════════════════════════════════════════════════════════
+  // Ambient
+  // ═══════════════════════════════════════════════════════════
+
+  const playAmbient = useCallback(async () => {
+    if (!audioManagerRef.current?.isInitialized()) await initialize();
+    audioManagerRef.current?.playAmbient();
+  }, [initialize]);
+
+  const stopAmbient = useCallback(() => {
+    audioManagerRef.current?.stopAmbient();
   }, []);
 
   const value: AudioContextValue = {
@@ -191,6 +298,8 @@ export function AudioProvider({ children }: AudioProviderProps) {
     initialize,
     toggleMute,
     setMuted: setMutedState,
+
+    // Legacy SFX
     playPaddleHit,
     playWallBounce,
     playGoalScored,
@@ -199,9 +308,22 @@ export function AudioProvider({ children }: AudioProviderProps) {
     playVictory,
     playDefeat,
     playButtonClick,
+
+    // New SFX
+    playHit,
+    playGoal,
+    playClick,
+    playHover,
+
+    // Music
     playMenuMusic,
     playGameMusic,
+    playOvertimeMusic,
     stopMusic,
+
+    // Ambient
+    playAmbient,
+    stopAmbient,
   };
 
   return (

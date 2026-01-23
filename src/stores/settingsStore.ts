@@ -47,6 +47,7 @@ const defaultAudioSettings: AudioSettings = {
   masterVolume: 80,
   sfxVolume: 100,
   musicVolume: 50,
+  ambientVolume: 70,
 };
 
 const defaultControlSettings: ControlSettings = {

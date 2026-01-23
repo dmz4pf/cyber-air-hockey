@@ -23,6 +23,7 @@ export interface AudioSettings {
   masterVolume: number; // 0-100
   sfxVolume: number; // 0-100
   musicVolume: number; // 0-100
+  ambientVolume: number; // 0-100
 }
 
 export interface ControlSettings {
@@ -58,6 +59,7 @@ export const DEFAULT_AUDIO_SETTINGS: AudioSettings = {
   masterVolume: 80,
   sfxVolume: 100,
   musicVolume: 60,
+  ambientVolume: 70,
 };
 
 export const DEFAULT_CONTROL_SETTINGS: ControlSettings = {
