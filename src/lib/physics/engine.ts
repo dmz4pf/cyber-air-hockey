@@ -97,6 +97,7 @@ export function createGameEngine(callbacks: EngineCallbacks): GameEngine {
           // Apply paddle velocity to puck
           const transfer = paddleConfig.velocityTransfer;
           const maxVel = paddleConfig.maxVelocity;
+          const { puck: puckConfig } = PHYSICS_CONFIG;
 
           // Clamp paddle velocity contribution
           const velX =
@@ -105,10 +106,19 @@ export function createGameEngine(callbacks: EngineCallbacks): GameEngine {
             Math.max(-maxVel, Math.min(maxVel, paddleVel.y)) * transfer;
 
           // Add paddle velocity to puck's current velocity
-          Body.setVelocity(puck, {
-            x: puck.velocity.x + velX,
-            y: puck.velocity.y + velY,
-          });
+          let newVelX = puck.velocity.x + velX;
+          let newVelY = puck.velocity.y + velY;
+
+          // CRITICAL: Clamp TOTAL velocity to maxSpeed immediately
+          // This prevents velocity from exceeding maxSpeed after paddle hit
+          const newSpeed = Math.sqrt(newVelX ** 2 + newVelY ** 2);
+          if (newSpeed > puckConfig.maxSpeed) {
+            const scale = puckConfig.maxSpeed / newSpeed;
+            newVelX *= scale;
+            newVelY *= scale;
+          }
+
+          Body.setVelocity(puck, { x: newVelX, y: newVelY });
 
           callbacks.onPaddleHit();
         }
@@ -242,14 +252,20 @@ export function createGameEngine(callbacks: EngineCallbacks): GameEngine {
 
 /**
  * Update physics simulation (call every frame)
+ *
+ * IMPORTANT: Velocity and position clamping happens AFTER Engine.update()
+ * to catch any velocity spikes from collision callbacks.
  */
 export function updatePhysics(engine: Matter.Engine, delta: number): void {
-  const { puck: puckConfig } = PHYSICS_CONFIG;
+  const { puck: puckConfig, table } = PHYSICS_CONFIG;
 
-  // Get puck body from engine
+  // Step physics simulation FIRST
+  Engine.update(engine, delta);
+
+  // THEN clamp velocity and position (catches collision-induced spikes)
   const puckBody = engine.world.bodies.find((b) => b.label === 'puck');
   if (puckBody) {
-    // Clamp puck speed to max
+    // 1. Clamp puck speed to max
     const speed = Math.sqrt(
       puckBody.velocity.x ** 2 + puckBody.velocity.y ** 2
     );
@@ -260,8 +276,28 @@ export function updatePhysics(engine: Matter.Engine, delta: number): void {
         y: puckBody.velocity.y * scale,
       });
     }
-  }
 
-  // Step physics simulation
-  Engine.update(engine, delta);
+    // 2. Clamp puck position to arena bounds (prevents tunneling escape)
+    const margin = puckConfig.radius + 5; // Small buffer inside walls
+    const minX = margin;
+    const maxX = table.width - margin;
+    const minY = margin;
+    const maxY = table.height - margin;
+
+    const pos = puckBody.position;
+    const clampedX = Math.max(minX, Math.min(maxX, pos.x));
+    const clampedY = Math.max(minY, Math.min(maxY, pos.y));
+
+    // If puck escaped bounds, push it back and reverse velocity component
+    if (pos.x !== clampedX || pos.y !== clampedY) {
+      Body.setPosition(puckBody, { x: clampedX, y: clampedY });
+
+      // Reverse velocity if hitting boundary (acts as wall bounce)
+      const vel = puckBody.velocity;
+      Body.setVelocity(puckBody, {
+        x: pos.x !== clampedX ? -vel.x * 0.8 : vel.x,
+        y: pos.y !== clampedY ? -vel.y * 0.8 : vel.y,
+      });
+    }
+  }
 }
