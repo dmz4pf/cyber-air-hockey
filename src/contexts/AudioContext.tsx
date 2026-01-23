@@ -152,12 +152,8 @@ export function AudioProvider({ children }: AudioProviderProps) {
   useEffect(() => {
     const handleInteraction = async () => {
       await synthRef.current?.unlock();
-
-      // Start ambient on first interaction
-      const ambient = ambientRef.current;
-      if (ambient && !isMuted) {
-        await ambient.start();
-      }
+      // Note: Ambient NOT auto-started to preserve game performance
+      // Call startAmbient() explicitly if desired
 
       document.removeEventListener('click', handleInteraction);
       document.removeEventListener('touchstart', handleInteraction);
@@ -173,7 +169,7 @@ export function AudioProvider({ children }: AudioProviderProps) {
       document.removeEventListener('touchstart', handleInteraction);
       document.removeEventListener('keydown', handleInteraction);
     };
-  }, [isMuted]);
+  }, []);
 
   // ═══════════════════════════════════════════════════════════
   // GAMEPLAY SOUNDS
