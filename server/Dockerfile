@@ -1,8 +1,8 @@
-# Air Hockey Server with Linera Blockchain Support
+# Air Hockey Server with Linera Blockchain (Conway Testnet)
 # Build time: ~10-15 minutes for Rust compilation
 
 # =============================================================================
-# Stage 1: Install Linera CLI
+# Stage 1: Build Linera CLI (Conway testnet v0.15.x)
 # =============================================================================
 FROM rust:1.82-bookworm AS linera-builder
 
@@ -15,18 +15,12 @@ RUN apt-get update && apt-get install -y \
     clang \
     && rm -rf /var/lib/apt/lists/*
 
-# Set cargo home explicitly
-ENV CARGO_HOME=/usr/local/cargo
-ENV PATH="${CARGO_HOME}/bin:${PATH}"
-
-# Install Linera CLI from crates.io
+# Install Linera CLI from crates.io (Conway testnet compatible)
+# CARGO_HOME in rust docker image = /usr/local/cargo
 RUN cargo install --locked linera-service@0.15.8
 
-# Debug: List installed binaries
-RUN ls -la ${CARGO_HOME}/bin/
-
-# Verify installation
-RUN ${CARGO_HOME}/bin/linera --version
+# Verify installation (correct path for rust docker image!)
+RUN ls -la /usr/local/cargo/bin/ && /usr/local/cargo/bin/linera --version
 
 # =============================================================================
 # Stage 2: Build Node.js application
@@ -35,16 +29,10 @@ FROM node:20-bookworm-slim AS node-builder
 
 WORKDIR /app
 
-# Copy package files
 COPY package*.json ./
-
-# Install dependencies
 RUN npm ci
 
-# Copy source code
 COPY . .
-
-# Build TypeScript
 RUN npm run build
 
 # =============================================================================
@@ -61,30 +49,25 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copy Linera binary from builder (correct path for rust docker image)
+# Copy Linera binary from builder (correct path!)
 COPY --from=linera-builder /usr/local/cargo/bin/linera /usr/local/bin/linera
 
-# Make sure linera is executable
-RUN chmod +x /usr/local/bin/linera
-
 # Verify linera is available
-RUN linera --version
+RUN chmod +x /usr/local/bin/linera && linera --version
 
-# Copy node modules and built application
+# Copy Node.js application
 COPY --from=node-builder /app/node_modules ./node_modules
 COPY --from=node-builder /app/dist ./dist
 COPY --from=node-builder /app/package*.json ./
 
-# Set environment variables
+# Environment
 ENV NODE_ENV=production
 ENV PORT=4000
 
-# Expose port
 EXPOSE 4000
 
-# Health check
+# Health check (longer start period for Linera service initialization)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
     CMD curl -f http://localhost:4000/api/health || exit 1
 
-# Start the server
 CMD ["npm", "start"]
