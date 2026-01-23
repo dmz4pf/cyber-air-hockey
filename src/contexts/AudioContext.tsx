@@ -1,8 +1,12 @@
 'use client';
 
 /**
- * AudioContext - React context for game audio
- * Uses synthesized sounds - works immediately, no files needed
+ * AudioContext - React context for complete game audio
+ *
+ * Integrates:
+ * - SynthAudio: Synthesized SFX (works immediately, no files)
+ * - MusicPlayer: Background music with crossfading (requires audio files)
+ * - AmbientSoundscape: Synthesized ambient layers (works immediately)
  */
 
 import React, {
@@ -14,6 +18,8 @@ import React, {
   useRef,
 } from 'react';
 import SynthAudio from '@/lib/audio/SynthAudio';
+import MusicPlayer from '@/lib/audio/MusicPlayer';
+import AmbientSoundscape, { type AmbientState } from '@/lib/audio/AmbientSoundscape';
 import { useSettingsStore } from '@/stores/settingsStore';
 
 interface AudioContextValue {
@@ -22,10 +28,10 @@ interface AudioContextValue {
 
   // Gameplay sounds
   playHit: (velocity: number) => void;
-  playPaddleHit: () => void; // Legacy - uses medium intensity
+  playPaddleHit: () => void;
   playWallBounce: () => void;
   playGoal: (isPlayer: boolean) => void;
-  playGoalScored: () => void; // Legacy
+  playGoalScored: () => void;
   playCountdownBeep: () => void;
   playCountdownGo: () => void;
   playMatchPoint: () => void;
@@ -35,7 +41,7 @@ interface AudioContextValue {
 
   // UI sounds
   playClick: () => void;
-  playButtonClick: () => void; // Legacy alias
+  playButtonClick: () => void;
   playHover: () => void;
   playBack: () => void;
   playToggle: (isOn: boolean) => void;
@@ -43,10 +49,18 @@ interface AudioContextValue {
   playPanelOpen: () => void;
   playPanelClose: () => void;
 
-  // Music (stubs - to be implemented with actual music files)
+  // Music
   playMenuMusic: () => void;
   playGameMusic: () => void;
+  playOvertimeMusic: () => void;
+  playVictoryMusic: () => void;
+  playDefeatMusic: () => void;
   stopMusic: () => void;
+
+  // Ambient
+  setAmbientState: (state: AmbientState) => void;
+  startAmbient: () => void;
+  stopAmbient: () => void;
 
   // Controls
   toggleMute: () => void;
@@ -76,34 +90,75 @@ interface AudioProviderProps {
 export function AudioProvider({ children }: AudioProviderProps) {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
-  const audioRef = useRef<SynthAudio | null>(null);
+
+  const synthRef = useRef<SynthAudio | null>(null);
+  const musicRef = useRef<MusicPlayer | null>(null);
+  const ambientRef = useRef<AmbientSoundscape | null>(null);
 
   const audioSettings = useSettingsStore((state) => state.settings.audio);
 
-  // Initialize
+  // Initialize all audio systems
   useEffect(() => {
-    const audio = SynthAudio.getInstance();
-    audioRef.current = audio;
-    audio.init().then(() => setIsInitialized(true));
+    const initAudio = async () => {
+      // Initialize SynthAudio (SFX)
+      const synth = SynthAudio.getInstance();
+      synthRef.current = synth;
+      await synth.init();
+
+      // Initialize MusicPlayer
+      const music = MusicPlayer.getInstance();
+      musicRef.current = music;
+      await music.init();
+
+      // Initialize AmbientSoundscape
+      const ambient = AmbientSoundscape.getInstance();
+      ambientRef.current = ambient;
+      await ambient.init();
+
+      setIsInitialized(true);
+    };
+
+    initAudio();
 
     return () => {
-      // Don't dispose - singleton shared across app
+      // Don't dispose - singletons shared across app
     };
   }, []);
 
   // Sync volume settings
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
+    const synth = synthRef.current;
+    const music = musicRef.current;
+    const ambient = ambientRef.current;
 
-    audio.setMasterVolume(audioSettings.masterVolume / 100);
-    audio.setSFXVolume(audioSettings.sfxVolume / 100);
+    if (synth) {
+      synth.setMasterVolume(audioSettings.masterVolume / 100);
+      synth.setSFXVolume(audioSettings.sfxVolume / 100);
+    }
+
+    if (music) {
+      music.setVolume((audioSettings.musicVolume / 100) * (audioSettings.masterVolume / 100));
+    }
+
+    if (ambient) {
+      const ambientVolume = 'ambientVolume' in audioSettings
+        ? (audioSettings as { ambientVolume: number }).ambientVolume
+        : 70;
+      ambient.setVolume((ambientVolume / 100) * (audioSettings.masterVolume / 100));
+    }
   }, [audioSettings]);
 
   // Auto-unlock on first interaction
   useEffect(() => {
     const handleInteraction = async () => {
-      await audioRef.current?.unlock();
+      await synthRef.current?.unlock();
+
+      // Start ambient on first interaction
+      const ambient = ambientRef.current;
+      if (ambient && !isMuted) {
+        await ambient.start();
+      }
+
       document.removeEventListener('click', handleInteraction);
       document.removeEventListener('touchstart', handleInteraction);
       document.removeEventListener('keydown', handleInteraction);
@@ -118,113 +173,168 @@ export function AudioProvider({ children }: AudioProviderProps) {
       document.removeEventListener('touchstart', handleInteraction);
       document.removeEventListener('keydown', handleInteraction);
     };
-  }, []);
+  }, [isMuted]);
 
-  // Gameplay sounds
+  // ═══════════════════════════════════════════════════════════
+  // GAMEPLAY SOUNDS
+  // ═══════════════════════════════════════════════════════════
+
   const playHit = useCallback((velocity: number) => {
-    audioRef.current?.playHit(velocity);
+    synthRef.current?.playHit(velocity);
   }, []);
 
   const playPaddleHit = useCallback(() => {
-    audioRef.current?.playHit(10); // Medium intensity
+    synthRef.current?.playHit(10);
   }, []);
 
   const playWallBounce = useCallback(() => {
-    audioRef.current?.playWallBounce();
+    synthRef.current?.playWallBounce();
   }, []);
 
   const playGoal = useCallback((isPlayer: boolean) => {
-    audioRef.current?.playGoal(isPlayer);
+    synthRef.current?.playGoal(isPlayer);
+    ambientRef.current?.triggerGoal();
   }, []);
 
   const playGoalScored = useCallback(() => {
-    audioRef.current?.playGoal(true);
+    synthRef.current?.playGoal(true);
+    ambientRef.current?.triggerGoal();
   }, []);
 
   const playCountdownBeep = useCallback(() => {
-    audioRef.current?.playCountdownBeep();
+    synthRef.current?.playCountdownBeep();
   }, []);
 
   const playCountdownGo = useCallback(() => {
-    audioRef.current?.playCountdownGo();
+    synthRef.current?.playCountdownGo();
   }, []);
 
   const playMatchPoint = useCallback(() => {
-    audioRef.current?.playMatchPoint();
+    synthRef.current?.playMatchPoint();
+    ambientRef.current?.setState('matchPoint');
   }, []);
 
   const playMatchEnd = useCallback(() => {
-    audioRef.current?.playMatchEnd();
+    synthRef.current?.playMatchEnd();
   }, []);
 
   const playVictory = useCallback(() => {
-    audioRef.current?.playVictory();
+    synthRef.current?.playVictory();
   }, []);
 
   const playDefeat = useCallback(() => {
-    audioRef.current?.playDefeat();
+    synthRef.current?.playDefeat();
   }, []);
 
-  // UI sounds
+  // ═══════════════════════════════════════════════════════════
+  // UI SOUNDS
+  // ═══════════════════════════════════════════════════════════
+
   const playClick = useCallback(() => {
-    audioRef.current?.playClick();
+    synthRef.current?.playClick();
   }, []);
 
   const playButtonClick = useCallback(() => {
-    audioRef.current?.playClick();
+    synthRef.current?.playClick();
   }, []);
 
   const playHover = useCallback(() => {
-    audioRef.current?.playHover();
+    synthRef.current?.playHover();
   }, []);
 
   const playBack = useCallback(() => {
-    audioRef.current?.playBack();
+    synthRef.current?.playBack();
   }, []);
 
   const playToggle = useCallback((isOn: boolean) => {
-    audioRef.current?.playToggle(isOn);
+    synthRef.current?.playToggle(isOn);
   }, []);
 
   const playError = useCallback(() => {
-    audioRef.current?.playError();
+    synthRef.current?.playError();
   }, []);
 
   const playPanelOpen = useCallback(() => {
-    audioRef.current?.playPanelOpen();
+    synthRef.current?.playPanelOpen();
   }, []);
 
   const playPanelClose = useCallback(() => {
-    audioRef.current?.playPanelClose();
+    synthRef.current?.playPanelClose();
   }, []);
 
-  // Music stubs (to be implemented with actual music files in Phase 4)
+  // ═══════════════════════════════════════════════════════════
+  // MUSIC
+  // ═══════════════════════════════════════════════════════════
+
   const playMenuMusic = useCallback(() => {
-    // TODO: Implement with actual music files
+    musicRef.current?.playMenuMusic();
+    ambientRef.current?.setState('menu');
   }, []);
 
   const playGameMusic = useCallback(() => {
-    // TODO: Implement with actual music files
+    musicRef.current?.playGameMusic();
+    ambientRef.current?.setState('active');
+  }, []);
+
+  const playOvertimeMusic = useCallback(() => {
+    musicRef.current?.playOvertimeMusic();
+    ambientRef.current?.setState('overtime');
+  }, []);
+
+  const playVictoryMusic = useCallback(() => {
+    musicRef.current?.playVictory();
+  }, []);
+
+  const playDefeatMusic = useCallback(() => {
+    musicRef.current?.playDefeat();
   }, []);
 
   const stopMusic = useCallback(() => {
-    // TODO: Implement with actual music files
+    musicRef.current?.stopMusic();
   }, []);
 
-  // Controls
+  // ═══════════════════════════════════════════════════════════
+  // AMBIENT
+  // ═══════════════════════════════════════════════════════════
+
+  const setAmbientState = useCallback((state: AmbientState) => {
+    ambientRef.current?.setState(state);
+  }, []);
+
+  const startAmbient = useCallback(async () => {
+    await ambientRef.current?.start();
+  }, []);
+
+  const stopAmbient = useCallback(() => {
+    ambientRef.current?.stop();
+  }, []);
+
+  // ═══════════════════════════════════════════════════════════
+  // CONTROLS
+  // ═══════════════════════════════════════════════════════════
+
   const toggleMute = useCallback(() => {
-    const newMuted = audioRef.current?.toggleMute() ?? false;
+    const newMuted = synthRef.current?.toggleMute() ?? false;
+    musicRef.current?.setMuted(newMuted);
+    ambientRef.current?.setMuted(newMuted);
     setIsMuted(newMuted);
   }, []);
 
   const setMutedState = useCallback((muted: boolean) => {
-    audioRef.current?.setMuted(muted);
+    synthRef.current?.setMuted(muted);
+    musicRef.current?.setMuted(muted);
+    ambientRef.current?.setMuted(muted);
     setIsMuted(muted);
   }, []);
+
+  // ═══════════════════════════════════════════════════════════
+  // CONTEXT VALUE
+  // ═══════════════════════════════════════════════════════════
 
   const value: AudioContextValue = {
     isInitialized,
     isMuted,
+    // Gameplay
     playHit,
     playPaddleHit,
     playWallBounce,
@@ -236,6 +346,7 @@ export function AudioProvider({ children }: AudioProviderProps) {
     playMatchEnd,
     playVictory,
     playDefeat,
+    // UI
     playClick,
     playButtonClick,
     playHover,
@@ -244,9 +355,18 @@ export function AudioProvider({ children }: AudioProviderProps) {
     playError,
     playPanelOpen,
     playPanelClose,
+    // Music
     playMenuMusic,
     playGameMusic,
+    playOvertimeMusic,
+    playVictoryMusic,
+    playDefeatMusic,
     stopMusic,
+    // Ambient
+    setAmbientState,
+    startAmbient,
+    stopAmbient,
+    // Controls
     toggleMute,
     setMuted: setMutedState,
   };
