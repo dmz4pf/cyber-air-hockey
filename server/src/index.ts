@@ -190,9 +190,18 @@ app.get('/api/balance/:chainId', async (req: Request, res: Response, next: NextF
 // Error Handling Middleware
 // ============================================
 
-app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
   console.error(`[Server] Error: ${err.message}`);
   console.error(err.stack);
+
+  // Manually set CORS headers for error responses
+  // This is critical because if an error occurs mid-request,
+  // the cors middleware may not have set these headers yet
+  const origin = req.headers.origin;
+  if (origin && (allowedOrigins.includes(origin) || origin.includes('vercel.app'))) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
 
   res.status(500).json({
     error: err.message || 'Internal server error',

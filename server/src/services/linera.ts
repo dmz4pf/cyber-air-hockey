@@ -315,7 +315,7 @@ export class LineraService extends EventEmitter {
   // Restart Handling
   // ==========================================================================
 
-  private async handleUnexpectedExit(): Promise<void> {
+  private handleUnexpectedExit(): void {
     this.serviceProcess = null;
 
     if (this.restartAttempts >= this.config.maxRestartAttempts) {
@@ -329,14 +329,17 @@ export class LineraService extends EventEmitter {
 
     log.info(`Restarting service in ${delay}ms (attempt ${this.restartAttempts}/${this.config.maxRestartAttempts})...`);
 
-    setTimeout(async () => {
-      try {
-        await this.start();
-        this.emit('restarted', { attempt: this.restartAttempts });
-      } catch (error) {
-        log.error('Restart failed:', (error as Error).message);
-        this.handleUnexpectedExit();
-      }
+    // Use .then()/.catch() pattern instead of async/await in setTimeout
+    // to properly handle promise rejections and prevent unhandled rejections
+    setTimeout(() => {
+      this.start()
+        .then(() => {
+          this.emit('restarted', { attempt: this.restartAttempts });
+        })
+        .catch((error) => {
+          log.error('Restart failed:', (error as Error).message);
+          this.handleUnexpectedExit();
+        });
     }, delay);
   }
 
@@ -352,7 +355,12 @@ export class LineraService extends EventEmitter {
     variables?: Record<string, unknown>
   ): Promise<T> {
     if (!this.isRunning()) {
-      throw new Error('Linera service is not running');
+      // Provide a more helpful error message that indicates the service may be restarting
+      const isRestarting = this.restartAttempts > 0 && this.restartAttempts < this.config.maxRestartAttempts;
+      const message = isRestarting
+        ? `Linera service is restarting (attempt ${this.restartAttempts}/${this.config.maxRestartAttempts}). Please try again in a few seconds.`
+        : 'Linera service is not running. The server may be starting up or has encountered an error.';
+      throw new Error(message);
     }
 
     const endpoint = this.config.applicationId
@@ -400,6 +408,21 @@ export class LineraService extends EventEmitter {
    * Get the balance for a chain
    */
   async getBalance(chainId: string): Promise<Balance> {
+    // In mock mode, return a fake balance
+    if (this.mockMode) {
+      log.info(`[MOCK] Getting balance for chain ${chainId}`);
+      return { available: '1000.0', locked: '0' };
+    }
+
+    // Check if service is running before making the request
+    if (!this.isRunning()) {
+      const isRestarting = this.restartAttempts > 0 && this.restartAttempts < this.config.maxRestartAttempts;
+      const message = isRestarting
+        ? `Linera service is restarting (attempt ${this.restartAttempts}/${this.config.maxRestartAttempts}). Please try again in a few seconds.`
+        : 'Linera service is not running. The server may be starting up or has encountered an error.';
+      throw new Error(message);
+    }
+
     // Query the chain's balance via the service's system API
     const systemEndpoint = `${this.graphqlEndpoint}/chains/${chainId}`;
 
@@ -738,15 +761,7 @@ interface RawGame {
 
 export const lineraService = new LineraService();
 
-// Handle process termination
-process.on('SIGTERM', async () => {
-  log.info('Received SIGTERM, stopping linera service...');
-  await lineraService.stop();
-});
-
-process.on('SIGINT', async () => {
-  log.info('Received SIGINT, stopping linera service...');
-  await lineraService.stop();
-});
+// NOTE: Signal handlers are registered in index.ts to avoid duplicate handlers
+// which can cause race conditions during shutdown
 
 export default lineraService;
