@@ -10,7 +10,6 @@ import { useRouter } from 'next/navigation';
 import { motion, useAnimation, Variants } from 'framer-motion';
 import { cyberTheme } from '@/lib/cyber/theme';
 import { useGameStore } from '@/stores/gameStore';
-import { CyberButton } from '../ui/CyberButton';
 
 const TAGLINES = ['COMPETE', 'DOMINATE', 'WIN'];
 
@@ -143,7 +142,7 @@ export function HeroSection({ className = '' }: HeroSectionProps) {
 
   return (
     <section
-      className={`relative min-h-[70vh] flex items-center justify-center overflow-hidden ${className}`}
+      className={`relative min-h-screen flex items-center justify-center overflow-hidden ${className}`}
     >
       {/* Radial gradient overlay */}
       <motion.div
@@ -164,9 +163,9 @@ export function HeroSection({ className = '' }: HeroSectionProps) {
         animate={controls}
       >
         {/* Main heading with glitch effect */}
-        <motion.div className="relative mb-6" variants={titleVariants}>
+        <motion.div className="relative mb-12" variants={titleVariants}>
           <h1
-            className="text-6xl md:text-8xl font-black uppercase tracking-wider"
+            className="text-5xl md:text-7xl font-black uppercase tracking-wider"
             style={{
               fontFamily: cyberTheme.fonts.heading,
               color: cyberTheme.colors.text.primary,
@@ -237,12 +236,12 @@ export function HeroSection({ className = '' }: HeroSectionProps) {
 
         {/* Animated puck divider */}
         <motion.div
-          className="flex items-center justify-center gap-4 mb-6"
+          className="flex items-center justify-center gap-6 mb-10"
           variants={titleVariants}
         >
           {/* Left line - draws from center */}
           <motion.div
-            className="h-[2px] w-16 md:w-24 origin-right"
+            className="h-[2px] w-20 md:w-32 origin-right"
             style={{
               background: `linear-gradient(to right, transparent, ${cyberTheme.colors.primary})`,
             }}
@@ -294,7 +293,7 @@ export function HeroSection({ className = '' }: HeroSectionProps) {
 
           {/* Right line - draws from center */}
           <motion.div
-            className="h-[2px] w-16 md:w-24 origin-left"
+            className="h-[2px] w-20 md:w-32 origin-left"
             style={{
               background: `linear-gradient(to left, transparent, ${cyberTheme.colors.primary})`,
             }}
@@ -304,7 +303,7 @@ export function HeroSection({ className = '' }: HeroSectionProps) {
 
         {/* Cycling tagline with typewriter effect */}
         <motion.div
-          className="h-8 mb-10 overflow-hidden"
+          className="h-8 mb-16 overflow-hidden"
           variants={titleVariants}
         >
           <motion.p
@@ -328,19 +327,76 @@ export function HeroSection({ className = '' }: HeroSectionProps) {
           className="flex justify-center"
           variants={buttonVariants}
         >
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+          <motion.button
+            onClick={handlePlayNow}
+            className="relative group overflow-hidden"
+            style={{
+              fontFamily: cyberTheme.fonts.heading,
+              padding: '18px 48px',
+              fontSize: '1.25rem',
+              fontWeight: 700,
+              letterSpacing: '0.15em',
+              color: '#ffffff',
+              background: `linear-gradient(135deg, ${cyberTheme.colors.primary} 0%, #3B82F6 50%, ${cyberTheme.colors.primary} 100%)`,
+              backgroundSize: '200% 200%',
+              border: `2px solid ${cyberTheme.colors.primary}`,
+              borderRadius: '4px',
+              cursor: 'pointer',
+              boxShadow: `
+                0 0 20px ${cyberTheme.colors.primary}60,
+                0 4px 15px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1)
+              `,
+            }}
+            whileHover={{
+              scale: 1.05,
+              backgroundPosition: '100% 100%',
+              boxShadow: `
+                0 0 30px ${cyberTheme.colors.primary}80,
+                0 6px 20px rgba(0, 0, 0, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2)
+              `,
+            }}
+            whileTap={{ scale: 0.98 }}
+            transition={{ duration: 0.3 }}
           >
-            <CyberButton
-              variant="primary"
-              size="lg"
-              glow
-              onClick={handlePlayNow}
-            >
-              PLAY NOW
-            </CyberButton>
-          </motion.div>
+            {/* Animated gradient shine */}
+            <motion.div
+              className="absolute inset-0 opacity-0 group-hover:opacity-100"
+              style={{
+                background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)',
+              }}
+              animate={{
+                x: ['-100%', '100%'],
+              }}
+              transition={{
+                duration: 1,
+                repeat: Infinity,
+                repeatDelay: 1,
+              }}
+            />
+
+            {/* Button text */}
+            <span className="relative z-10">PLAY NOW</span>
+
+            {/* Corner accents */}
+            <div
+              className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2"
+              style={{ borderColor: 'rgba(255,255,255,0.5)' }}
+            />
+            <div
+              className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2"
+              style={{ borderColor: 'rgba(255,255,255,0.5)' }}
+            />
+            <div
+              className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2"
+              style={{ borderColor: 'rgba(255,255,255,0.5)' }}
+            />
+            <div
+              className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2"
+              style={{ borderColor: 'rgba(255,255,255,0.5)' }}
+            />
+          </motion.button>
         </motion.div>
       </motion.div>
 

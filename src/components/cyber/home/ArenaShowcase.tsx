@@ -47,10 +47,10 @@ export function ArenaShowcase() {
             color: cyberTheme.colors.primary,
             textShadow: `0 0 20px ${cyberTheme.colors.primary}`,
           }}
-          initial={{ opacity: 0, y: 50 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: false, amount: 0.3 }}
-          transition={{ duration: 0.8, delay: 0 }}
+          initial={{ opacity: 0, y: 80, scale: 0.9 }}
+          whileInView={{ opacity: 1, y: 0, scale: 1 }}
+          viewport={{ once: false, amount: 0.8, margin: "-100px" }}
+          transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
         >
           YOUR ARENA AWAITS
         </motion.h2>
@@ -64,8 +64,8 @@ export function ArenaShowcase() {
           }}
           initial={{ opacity: 0, y: 50 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: false, amount: 0.3 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
+          viewport={{ once: false, amount: 0.8, margin: "-100px" }}
+          transition={{ duration: 0.6, delay: 0.15, ease: [0.25, 0.46, 0.45, 0.94] }}
         >
           Step into the cyber arena where legends are born
         </motion.p>
@@ -78,10 +78,10 @@ export function ArenaShowcase() {
             aspectRatio: '16/9',
             perspective: 1000,
           }}
-          initial={{ opacity: 0, y: 50 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: false, amount: 0.2 }}
-          transition={{ duration: 0.8, delay: 0.4 }}
+          initial={{ opacity: 0, y: 60, scale: 0.95 }}
+          whileInView={{ opacity: 1, y: 0, scale: 1 }}
+          viewport={{ once: false, amount: 0.5, margin: "-50px" }}
+          transition={{ duration: 0.8, delay: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
         >
           <div
             ref={arenaRef}
@@ -243,10 +243,10 @@ export function ArenaShowcase() {
         {/* Status text */}
         <motion.div
           className="text-center mt-12"
-          initial={{ opacity: 0, y: 50 }}
+          initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: false, amount: 0.3 }}
-          transition={{ duration: 0.8, delay: 0.6 }}
+          viewport={{ once: false, amount: 0.8, margin: "-50px" }}
+          transition={{ duration: 0.6, delay: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
         >
           <div
             className="inline-flex items-center gap-3 px-6 py-3 rounded-full"

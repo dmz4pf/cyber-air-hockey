@@ -4,17 +4,17 @@
 
 export const cyberTheme = {
   colors: {
-    // Primary palette - Electric gaming cyan
-    primary: '#00F0FF', // Electric cyan - vibrant gaming accent
-    secondary: '#00D4E6', // Cyan 600 - secondary accent
+    // Primary palette
+    primary: '#1D4ED8', // Deep Blue - main accent
+    secondary: '#1E40AF', // Blue 800 - secondary accent
 
     // Backgrounds
     bg: {
       primary: '#050510', // Darkest
       secondary: '#0a0a20', // Dark
       tertiary: '#111827', // Slightly lighter
-      panel: 'rgba(0, 240, 255, 0.1)',
-      panelHover: 'rgba(0, 240, 255, 0.15)',
+      panel: 'rgba(29, 78, 216, 0.1)',
+      panelHover: 'rgba(29, 78, 216, 0.15)',
       overlay: 'rgba(5, 5, 16, 0.95)',
     },
 
@@ -49,14 +49,14 @@ export const cyberTheme = {
       primary: '#f8fafc',
       secondary: '#94a3b8',
       muted: '#64748b',
-      accent: '#00F0FF',
+      accent: '#1D4ED8',
     },
 
     // Borders
     border: {
-      default: 'rgba(0, 240, 255, 0.3)',
-      active: '#00F0FF',
-      subtle: 'rgba(0, 240, 255, 0.1)',
+      default: 'rgba(29, 78, 216, 0.3)',
+      active: '#1D4ED8',
+      subtle: 'rgba(29, 78, 216, 0.1)',
     },
 
     // Puck
