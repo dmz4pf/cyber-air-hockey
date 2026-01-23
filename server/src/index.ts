@@ -268,5 +268,19 @@ async function shutdown(signal: string): Promise<void> {
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
+// Global error handlers to prevent crashes from unhandled async errors
+// These are critical for stability on Railway where crashes = 502 errors
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Server] Unhandled Promise Rejection:', reason);
+  // Don't exit - log and continue. The server should stay up.
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('[Server] Uncaught Exception:', error);
+  // For uncaught exceptions, we log but don't immediately exit
+  // This allows in-flight requests to complete
+  // The process will be restarted by Railway if it becomes unhealthy
+});
+
 // Start the server
 startServer();

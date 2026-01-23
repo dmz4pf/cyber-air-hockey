@@ -66,13 +66,15 @@ RUN chmod +x /app/start.sh
 
 # Environment
 ENV NODE_ENV=production
-ENV PORT=4000
+# NOTE: Railway sets PORT dynamically - do NOT hardcode it here
+# The default 3001 is only used for local development
 
-EXPOSE 4000
+EXPOSE 3001
 
-# Health check (longer start period for wallet init + Linera service)
+# Health check uses the PORT environment variable (Railway sets this dynamically)
+# The shell form allows variable expansion at runtime
 HEALTHCHECK --interval=30s --timeout=30s --start-period=180s --retries=5 \
-    CMD curl -f http://localhost:4000/api/health || exit 1
+    CMD curl -f http://localhost:${PORT:-3001}/api/health || exit 1
 
 # Use startup script that initializes wallet before starting server
 CMD ["/app/start.sh"]
