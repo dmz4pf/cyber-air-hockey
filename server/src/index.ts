@@ -20,12 +20,34 @@ const app = express()
 
 // Middleware
 app.use(express.json());
+// CORS configuration - allow Vercel frontend and localhost
+const allowedOrigins = [
+  'https://cyberairhockey.vercel.app',
+  'https://cyber-air-hockey.vercel.app',
+  process.env.FRONTEND_URL,
+  'http://localhost:3000',
+  'http://localhost:3001',
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: true, // Allow all origins for development
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, curl, etc.)
+      if (!origin) return callback(null, true);
+      // Allow if origin is in allowed list or matches vercel pattern
+      if (allowedOrigins.includes(origin) || origin.includes('vercel.app')) {
+        return callback(null, true);
+      }
+      return callback(null, true); // Allow all for now
+    },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
+
+// Handle preflight requests explicitly
+app.options('*', cors());
 
 // ============================================
 // Health Check
