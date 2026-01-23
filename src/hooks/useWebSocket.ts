@@ -11,7 +11,19 @@ import type {
   NetworkPaddleState,
 } from '@/types/websocket';
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080';
+// Auto-detect WebSocket URL for cross-device compatibility
+const getWsUrl = (): string => {
+  if (process.env.NEXT_PUBLIC_WS_URL) {
+    return process.env.NEXT_PUBLIC_WS_URL;
+  }
+  if (typeof window === 'undefined') {
+    return 'ws://localhost:8080';
+  }
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  return `${protocol}://${window.location.hostname}:8080`;
+};
+
+const WS_URL = getWsUrl();
 const RECONNECT_BASE_DELAY = 1000; // Start with 1s delay
 const RECONNECT_MAX_DELAY = 10000; // Cap at 10s
 const PING_INTERVAL = 15000; // Ping every 15s to keep Render awake (free tier sleeps after 15min)

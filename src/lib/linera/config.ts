@@ -53,9 +53,19 @@ export const GRAPHQL_ENDPOINTS = {
 } as const;
 
 // WebSocket Configuration (for real-time updates)
+// Note: gameServerUrl getter auto-detects hostname for cross-device compatibility
 export const WS_CONFIG = {
-  // WebSocket URL for game server
-  gameServerUrl: process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080',
+  // WebSocket URL for game server - computed at runtime for cross-device support
+  get gameServerUrl(): string {
+    if (process.env.NEXT_PUBLIC_WS_URL) {
+      return process.env.NEXT_PUBLIC_WS_URL;
+    }
+    if (typeof window === 'undefined') {
+      return 'ws://localhost:8080';
+    }
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    return `${protocol}://${window.location.hostname}:8080`;
+  },
 
   // WebSocket URL for Linera notifications (if separate)
   lineraNotificationsUrl: process.env.NEXT_PUBLIC_LINERA_WS_URL || '',
@@ -64,7 +74,7 @@ export const WS_CONFIG = {
   reconnectAttempts: 5,
   reconnectDelay: 1000,
   reconnectDelayMax: 30000,
-} as const;
+};
 
 // Validation helpers
 export function validateConfig(): { valid: boolean; errors: string[] } {

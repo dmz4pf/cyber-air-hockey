@@ -73,11 +73,31 @@ export class LineraAPIError extends Error {
 // API Client
 // =============================================================================
 
+/**
+ * Get the API base URL, auto-detecting hostname for cross-device compatibility
+ */
+function getApiBaseUrl(): string {
+  // Always prefer explicit env var if set
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+
+  // Server-side rendering - use localhost default
+  if (typeof window === 'undefined') {
+    return 'http://localhost:4000';
+  }
+
+  // Client-side: auto-detect from current hostname
+  // This allows the app to work from any device on the network
+  const protocol = window.location.protocol === 'https:' ? 'https' : 'http';
+  return `${protocol}://${window.location.hostname}:4000`;
+}
+
 class LineraAPI {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    this.baseUrl = getApiBaseUrl();
   }
 
   // ---------------------------------------------------------------------------
