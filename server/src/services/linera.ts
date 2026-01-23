@@ -502,12 +502,18 @@ export class LineraService extends EventEmitter {
     `);
     const gameId = nextIdData.nextGameId;
 
+    // Convert stake to integer for contract
+    const stakeNum = parseInt(stake, 10);
+    if (isNaN(stakeNum) || stakeNum < 0) {
+      throw new Error(`Invalid stake value: ${stake}`);
+    }
+
     // Schedule the create game operation
     await this.query(`
-      mutation CreateGame($stake: String!, $roomCode: String!) {
+      mutation CreateGame($stake: Int!, $roomCode: String!) {
         createGame(stake: $stake, roomCode: $roomCode)
       }
-    `, { stake, roomCode });
+    `, { stake: stakeNum, roomCode });
 
     log.info(`Game created with ID: ${gameId}`);
     return gameId;
@@ -553,11 +559,17 @@ export class LineraService extends EventEmitter {
       throw new Error(`Game not found with ID or code: ${gameIdOrRoomCode}`);
     }
 
+    // Convert gameId to integer for contract
+    const gameIdNum = parseInt(actualGameId, 10);
+    if (isNaN(gameIdNum) || gameIdNum < 0) {
+      throw new Error(`Invalid gameId: ${actualGameId}`);
+    }
+
     await this.query(`
-      mutation JoinGame($gameId: String!) {
+      mutation JoinGame($gameId: Int!) {
         joinGame(gameId: $gameId)
       }
-    `, { gameId: actualGameId });
+    `, { gameId: gameIdNum });
 
     log.info(`Joined game: ${actualGameId}`);
 
@@ -584,15 +596,13 @@ export class LineraService extends EventEmitter {
       query GetOpenGames {
         openGames {
           id
+          roomCode
           creator
           opponent
           stake
-          roomCode
           status
-          winner
-          player1Score
-          player2Score
-          createdAt
+          creatorSubmitted
+          opponentSubmitted
         }
       }
     `);
@@ -613,22 +623,26 @@ export class LineraService extends EventEmitter {
 
     this.validateConfig();
 
+    // Convert gameId to integer for contract
+    const gameIdNum = parseInt(gameId, 10);
+    if (isNaN(gameIdNum) || gameIdNum < 0) {
+      return null;
+    }
+
     const data = await this.query<{ game: RawGame | null }>(`
-      query GetGame($gameId: String!) {
+      query GetGame($gameId: Int!) {
         game(id: $gameId) {
           id
+          roomCode
           creator
           opponent
           stake
-          roomCode
           status
-          winner
-          player1Score
-          player2Score
-          createdAt
+          creatorSubmitted
+          opponentSubmitted
         }
       }
-    `, { gameId });
+    `, { gameId: gameIdNum });
 
     if (!data.game) {
       return null;
@@ -657,11 +671,17 @@ export class LineraService extends EventEmitter {
 
     this.validateConfig();
 
+    // Convert gameId to integer for contract
+    const gameIdNum = parseInt(gameId, 10);
+    if (isNaN(gameIdNum) || gameIdNum < 0) {
+      throw new Error(`Invalid gameId: ${gameId}`);
+    }
+
     await this.query(`
-      mutation SubmitResult($gameId: String!, $p1Score: Int!, $p2Score: Int!) {
-        submitResult(gameId: $gameId, player1Score: $p1Score, player2Score: $p2Score)
+      mutation SubmitResult($gameId: Int!, $myScore: Int!, $opponentScore: Int!) {
+        submitResult(gameId: $gameId, myScore: $myScore, opponentScore: $opponentScore)
       }
-    `, { gameId, p1Score, p2Score });
+    `, { gameId: gameIdNum, myScore: p1Score, opponentScore: p2Score });
 
     log.info(`Result submitted for game ${gameId}: P1=${p1Score}, P2=${p2Score}`);
   }
@@ -683,11 +703,17 @@ export class LineraService extends EventEmitter {
 
     this.validateConfig();
 
+    // Convert gameId to integer for contract
+    const gameIdNum = parseInt(gameId, 10);
+    if (isNaN(gameIdNum) || gameIdNum < 0) {
+      throw new Error(`Invalid gameId: ${gameId}`);
+    }
+
     await this.query(`
-      mutation CancelGame($gameId: String!) {
+      mutation CancelGame($gameId: Int!) {
         cancelGame(gameId: $gameId)
       }
-    `, { gameId });
+    `, { gameId: gameIdNum });
 
     log.info(`Game cancelled: ${gameId}`);
   }
@@ -706,17 +732,26 @@ export class LineraService extends EventEmitter {
   }
 
   private mapRawGameToGame(raw: RawGame): Game {
+    // Map contract status to server status
+    const statusMap: Record<string, Game['status']> = {
+      'Waiting': 'waiting',
+      'Playing': 'active',
+      'Completed': 'completed',
+      'Cancelled': 'cancelled',
+      'Disputed': 'completed',
+    };
+
     return {
       id: raw.id,
       creator: raw.creator,
       opponent: raw.opponent || null,
       stake: raw.stake,
       roomCode: raw.roomCode,
-      status: raw.status as Game['status'],
-      winner: raw.winner || null,
-      player1Score: raw.player1Score ?? 0,
-      player2Score: raw.player2Score ?? 0,
-      createdAt: new Date(raw.createdAt),
+      status: statusMap[raw.status] || 'waiting',
+      winner: null,
+      player1Score: 0,
+      player2Score: 0,
+      createdAt: new Date(),
     };
   }
 
@@ -744,15 +779,13 @@ export class LineraService extends EventEmitter {
 
 interface RawGame {
   id: string;
+  roomCode: string;
   creator: string;
   opponent?: string | null;
   stake: string;
-  roomCode: string;
-  status: string;
-  winner?: string | null;
-  player1Score?: number;
-  player2Score?: number;
-  createdAt: string;
+  status: 'Waiting' | 'Playing' | 'Completed' | 'Cancelled' | 'Disputed';
+  creatorSubmitted: boolean;
+  opponentSubmitted: boolean;
 }
 
 // ============================================================================

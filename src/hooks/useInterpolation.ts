@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useMemo } from 'react';
 
 interface Snapshot {
   x: number;
@@ -175,14 +175,14 @@ export function useInterpolation(options: InterpolationOptions = {}) {
    */
   const getBufferSize = useCallback(() => snapshotsRef.current.length, []);
 
-  return {
+  return useMemo(() => ({
     addSnapshot,
     getInterpolatedPosition,
     getLatestPosition,
     getVelocity,
     clear,
     getBufferSize,
-  };
+  }), [addSnapshot, getInterpolatedPosition, getLatestPosition, getVelocity, clear, getBufferSize]);
 }
 
 /**
@@ -218,5 +218,5 @@ export function usePaddleInterpolation(smoothing = 0.3) {
     currentRef.current = null;
   }, []);
 
-  return { setTarget, getPosition, clear };
+  return useMemo(() => ({ setTarget, getPosition, clear }), [setTarget, getPosition, clear]);
 }
