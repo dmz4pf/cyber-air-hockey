@@ -60,14 +60,19 @@ COPY --from=node-builder /app/node_modules ./node_modules
 COPY --from=node-builder /app/dist ./dist
 COPY --from=node-builder /app/package*.json ./
 
+# Copy startup script
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
 # Environment
 ENV NODE_ENV=production
 ENV PORT=4000
 
 EXPOSE 4000
 
-# Health check (longer start period for Linera service initialization)
-HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+# Health check (longer start period for wallet init + Linera service)
+HEALTHCHECK --interval=30s --timeout=30s --start-period=180s --retries=5 \
     CMD curl -f http://localhost:4000/api/health || exit 1
 
-CMD ["npm", "start"]
+# Use startup script that initializes wallet before starting server
+CMD ["/app/start.sh"]
