@@ -220,8 +220,12 @@ async function startServer(): Promise<void> {
     await lineraService.start();
     console.log('[Server] Linera service ready on port ' + LINERA_SERVICE_PORT);
   } catch (error) {
+    // Don't exit - run in degraded mode
+    // The server should stay up for health checks and non-Linera features
+    // Linera operations will return errors but won't crash the server
     console.error('[Server] Failed to start Linera service:', error);
-    process.exit(1);
+    console.warn('[Server] Running in DEGRADED MODE - Linera operations will fail');
+    console.warn('[Server] The service will attempt to restart automatically');
   }
 
   // Start the Linera queue processor for retry mechanism
