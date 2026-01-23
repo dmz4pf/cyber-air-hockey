@@ -6,6 +6,7 @@ import { WagmiProvider } from 'wagmi';
 import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit';
 import { config } from '@/lib/wagmi/config';
 import { DesignProvider } from '@/designs';
+import { AudioProvider } from '@/contexts/AudioContext';
 
 // Import RainbowKit styles
 import '@rainbow-me/rainbowkit/styles.css';
@@ -46,7 +47,9 @@ export function Providers({ children }: { children: ReactNode }) {
           modalSize="compact"
         >
           <DesignProvider>
-            {children}
+            <AudioProvider>
+              {children}
+            </AudioProvider>
           </DesignProvider>
         </RainbowKitProvider>
       </QueryClientProvider>

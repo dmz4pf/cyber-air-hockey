@@ -11,6 +11,7 @@ import {
 import { PHYSICS_CONFIG } from '@/lib/physics/config';
 import { useGameStore } from '@/stores/gameStore';
 import { Player } from '@/types/game';
+import { useAudioOptional } from '@/contexts/AudioContext';
 
 export function useGameEngine() {
   const gameEngineRef = useRef<GameEngine | null>(null);
@@ -22,18 +23,31 @@ export function useGameEngine() {
   const scoreGoal = useGameStore((state) => state.scoreGoal);
   const resumeAfterGoal = useGameStore((state) => state.resumeAfterGoal);
 
+  // Audio context for sound effects
+  const audio = useAudioOptional();
+
+  // Store audio ref for use in callbacks
+  const audioRef = useRef(audio);
+  useEffect(() => {
+    audioRef.current = audio;
+  }, [audio]);
+
   // Initialize engine
   useEffect(() => {
     const gameEngine = createGameEngine({
       onGoal: (scorer: Player) => {
+        // Play goal sound
+        audioRef.current?.playGoalScored();
         // scoreGoal handles status transition internally
         scoreGoal(scorer);
       },
       onPaddleHit: () => {
-        // Could add sound here
+        // Play paddle hit sound
+        audioRef.current?.playPaddleHit();
       },
       onWallHit: () => {
-        // Could add sound here
+        // Play wall bounce sound
+        audioRef.current?.playWallBounce();
       },
     });
 

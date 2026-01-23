@@ -28,6 +28,7 @@ import { useMultiplayerGameEngine } from '@/hooks/useMultiplayerGameEngine';
 import { usePlayerInput } from '@/hooks/usePlayerInput';
 import { useAIOpponent } from '@/hooks/useAIOpponent';
 import { useDynamicWallet } from '@/hooks/useDynamicWallet';
+import { useAudioOptional } from '@/contexts/AudioContext';
 import { GameCanvas, GameCanvasRef } from '@/components/game/GameCanvas';
 import {
   GameHUD,
@@ -65,6 +66,9 @@ export default function CyberGamePage() {
 
   const settings = useSettingsStore((state) => state.settings);
 
+  // Audio context for music and sound effects
+  const audio = useAudioOptional();
+
   // Is this a multiplayer game in active play?
   const isMultiplayerGame = mode === 'multiplayer' && multiplayerGameInfo?.gameId;
   const isInMultiplayerGameplay = isMultiplayerGame && ['countdown', 'playing', 'paused', 'goal', 'gameover'].includes(pageState);
@@ -81,6 +85,55 @@ export default function CyberGamePage() {
       setMaxScore(settings.game.scoreToWin);
     }
   }, [settings.game.scoreToWin, maxScore, setMaxScore]);
+
+  // ============================================================================
+  // Audio: Music state management
+  // ============================================================================
+  useEffect(() => {
+    if (!audio) return;
+
+    // Play menu music during setup screens
+    if (['mode-selection', 'ai-setup', 'multiplayer-lobby', 'waiting', 'ready'].includes(pageState)) {
+      audio.playMenuMusic();
+    }
+    // Play gameplay music during active game
+    else if (['countdown', 'playing', 'paused', 'goal'].includes(pageState)) {
+      audio.playGameMusic();
+    }
+    // Stop music at game over (fanfares will play instead)
+    else if (pageState === 'gameover') {
+      audio.stopMusic();
+    }
+  }, [pageState, audio]);
+
+  // Audio: Countdown beeps
+  useEffect(() => {
+    if (!audio) return;
+
+    if (status === 'countdown' && countdown > 0) {
+      audio.playCountdownBeep();
+    } else if (status === 'countdown' && countdown === 0) {
+      audio.playCountdownGo();
+    }
+  }, [status, countdown, audio]);
+
+  // Audio: Victory/Defeat at game over (AI mode only - multiplayer handles its own)
+  const scores = useGameStore((state) => state.scores);
+  const prevStatusRef = useRef(status);
+  useEffect(() => {
+    if (!audio || isInMultiplayerGameplay) return;
+
+    // Only trigger on transition TO gameover
+    if (status === 'gameover' && prevStatusRef.current !== 'gameover') {
+      const playerWon = scores.player1 >= maxScore;
+      if (playerWon) {
+        audio.playVictory();
+      } else {
+        audio.playDefeat();
+      }
+    }
+    prevStatusRef.current = status;
+  }, [status, scores, maxScore, audio, isInMultiplayerGameplay]);
 
   // Keep canvas element ref in sync
   useEffect(() => {

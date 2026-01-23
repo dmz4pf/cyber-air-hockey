@@ -244,13 +244,6 @@ export default function CyberSettingsPage() {
               max={100}
             />
           </div>
-
-          <p
-            className="text-sm mt-4"
-            style={{ color: cyberTheme.colors.text.muted }}
-          >
-            Note: Audio is not yet implemented in this version.
-          </p>
         </HUDPanel>
 
         {/* Control Settings */}
