@@ -4,7 +4,7 @@
 # =============================================================================
 # Stage 1: Build Linera CLI (Conway testnet v0.15.x)
 # =============================================================================
-FROM rust:1.82-bookworm AS linera-builder
+FROM rust:1.86-bookworm AS linera-builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
