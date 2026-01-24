@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "copy-wasm": "mkdir -p public/linera && cp node_modules/@linera/client/dist/linera.js public/linera/linera_web.js && cp node_modules/@linera/client/dist/linera_bg.wasm public/linera/linera_web_bg.wasm",
+    "copy-wasm": "mkdir -p public/linera && cp node_modules/@linera/client/dist/linera.js public/linera/linera_web.js && cp node_modules/@linera/client/dist/linera_bg.wasm public/linera/linera_web_bg.wasm && cp -r node_modules/@linera/client/dist/snippets public/linera/snippets",
     "predev": "npm run copy-wasm",
     "prebuild": "npm run copy-wasm",
     "dev": "next dev",
