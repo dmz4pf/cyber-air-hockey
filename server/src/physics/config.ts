@@ -11,19 +11,19 @@ export const PHYSICS_CONFIG = {
   puck: {
     radius: 12,
     mass: 0.1,
-    restitution: 0.85,      // Reduced from 0.98 - walls absorb some energy
+    restitution: 0.98,      // Matched to AI mode - high bounce for energetic gameplay
     friction: 0,
-    frictionAir: 0.002,     // Increased from 0.0005 - puck slows down faster
-    maxSpeed: 20,           // Reduced from 25 - lower top speed
-    minSpeed: 2             // Minimum speed to prevent tediously slow gameplay
+    frictionAir: 0.0005,    // Matched to AI mode - near-zero for consistent speed
+    maxSpeed: 25,           // Matched to AI mode - same top speed
+    minSpeed: 2             // Keep minimum speed to prevent tediously slow gameplay
   },
   paddle: {
-    radius: 25,
+    radius: 30,             // Matched to AI mode - same paddle size
     mass: 1,
     restitution: 0.8,
     friction: 0.1,
-    velocityTransfer: 0.7,  // Increased from 0.5 - paddle speed matters more
-    maxVelocity: 15
+    velocityTransfer: 0.8,  // Matched to AI mode - 80% velocity transfer
+    maxVelocity: 30         // Matched to AI mode - responsive paddle movement
   },
   wall: {
     restitution: 0.9,
