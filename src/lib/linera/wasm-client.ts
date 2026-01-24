@@ -22,7 +22,7 @@ import type {
   GameCancelledEvent,
 } from './types';
 import { loadLinera, checkCrossOriginIsolation } from './linera-loader';
-import { connectAndDeriveLineraKey } from './key-derivation';
+import { connectAndDeriveLineraKey, LineraSignerInterface } from './key-derivation';
 import { LINERA_CONFIG } from './config';
 
 // Wallet state change listeners
@@ -46,7 +46,7 @@ export class WasmLineraClient implements LineraClient {
   private chainId: string | null = null;
   private owner: string | null = null;
   private metaMaskAddress: string | null = null;
-  private privateKey: unknown = null;
+  private privateKey: LineraSignerInterface | null = null;
 
   // Wallet state
   private walletState: WalletState = {

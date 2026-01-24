@@ -9,12 +9,65 @@
  */
 
 import { connectMetaMask, signMessage } from './metamask';
-import { loadLinera } from './linera-loader';
 
 // Deterministic message prefix for key derivation
 const AUTH_MESSAGE_PREFIX = 'Linera Air Hockey Auth';
 // Using timestamp: 0 ensures the same signature every time
 const DETERMINISTIC_TIMESTAMP = '0';
+
+/**
+ * Linera-compatible Signer implementation
+ *
+ * This matches the interface expected by Linera's Client class.
+ * Uses ethers.js for signing, which is the same as @linera/client's PrivateKey.
+ */
+export interface LineraSignerInterface {
+  address(): string;
+  sign(owner: string, value: Uint8Array): Promise<string>;
+  getPublicKey(owner: string): Promise<string>;
+  containsKey(owner: string): Promise<boolean>;
+}
+
+/**
+ * Create a Linera-compatible signer from a private key hex string
+ */
+async function createLineraPrivateKey(privateKeyHex: string): Promise<LineraSignerInterface> {
+  // Dynamically import ethers to avoid SSR issues
+  const { Wallet, isAddress } = await import('ethers');
+
+  const wallet = new Wallet(privateKeyHex);
+
+  return {
+    address(): string {
+      return wallet.address;
+    },
+
+    async sign(owner: string, value: Uint8Array): Promise<string> {
+      if (typeof owner !== 'string' ||
+          !isAddress(owner) ||
+          wallet.address.toLowerCase() !== owner.toLowerCase()) {
+        throw new Error('Invalid owner address');
+      }
+      return await wallet.signMessage(value);
+    },
+
+    async getPublicKey(owner: string): Promise<string> {
+      if (typeof owner !== 'string' ||
+          !isAddress(owner) ||
+          wallet.address.toLowerCase() !== owner.toLowerCase()) {
+        throw new Error('Invalid owner address');
+      }
+      return wallet.signingKey.publicKey;
+    },
+
+    async containsKey(owner: string): Promise<boolean> {
+      if (typeof owner !== 'string' || !isAddress(owner)) {
+        return false;
+      }
+      return wallet.address.toLowerCase() === owner.toLowerCase();
+    }
+  };
+}
 
 /**
  * Generate the deterministic authentication message
@@ -52,53 +105,23 @@ export async function deriveLineraCredentials(
   metaMaskAddress: string,
   signature: string
 ): Promise<{
-  privateKey: unknown;
+  privateKey: LineraSignerInterface;
   owner: string;
 }> {
   // Hash the signature to get 32 bytes for the private key
   const hashBytes = await sha256(signature);
 
-  // Load Linera WASM module
-  // The module structure varies, so we use 'any' for flexibility
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const linera = await loadLinera() as any;
+  // Convert hash bytes to hex string for ethers.Wallet
+  const privateKeyHex = '0x' + Array.from(hashBytes).map(b => b.toString(16).padStart(2, '0')).join('');
 
-  // Try to create private key from hash bytes
-  // The @linera/client API may vary - we try different approaches
-  let privateKey: unknown;
-  let owner: string;
-
-  // Approach 1: PrivateKey.fromBytes (if available)
-  if (linera.PrivateKey?.fromBytes) {
-    privateKey = linera.PrivateKey.fromBytes(hashBytes);
-    owner = (privateKey as { address: () => string }).address();
-  }
-  // Approach 2: signer.PrivateKey (namespace pattern)
-  else if (linera.signer?.PrivateKey) {
-    // If we can't create from bytes, we create random and warn
-    // This is a fallback - the hash-based approach is preferred
-    console.warn('[KeyDerivation] PrivateKey.fromBytes not available, using random key');
-    console.warn('[KeyDerivation] Key will NOT be deterministic across sessions');
-    const pk = linera.signer.PrivateKey.createRandom();
-    privateKey = pk;
-    owner = pk.address();
-  }
-  // Approach 3: Direct PrivateKey class
-  else if (linera.PrivateKey) {
-    if (linera.PrivateKey.createRandom) {
-      console.warn('[KeyDerivation] Using fallback random key');
-      const pk = linera.PrivateKey.createRandom();
-      privateKey = pk;
-      owner = pk.address();
-    } else {
-      throw new Error('Cannot create Linera private key - no compatible method found');
-    }
-  }
-  else {
-    throw new Error('Linera module does not export PrivateKey class');
-  }
+  // Create a Linera-compatible signer using ethers
+  // This matches the @linera/client signer interface exactly
+  const privateKey = await createLineraPrivateKey(privateKeyHex);
+  const owner = privateKey.address();
 
   console.log('[KeyDerivation] Derived Linera owner:', owner);
+  console.log('[KeyDerivation] MetaMask address:', metaMaskAddress);
+
   return { privateKey, owner };
 }
 
@@ -115,7 +138,7 @@ export async function deriveLineraCredentials(
  */
 export async function connectAndDeriveLineraKey(): Promise<{
   metaMaskAddress: string;
-  lineraPrivateKey: unknown;
+  lineraPrivateKey: LineraSignerInterface;
   lineraOwner: string;
   signature: string;
 }> {
@@ -151,7 +174,7 @@ export async function connectAndDeriveLineraKey(): Promise<{
 export async function deriveLineraKeyFromAddress(
   metaMaskAddress: string
 ): Promise<{
-  lineraPrivateKey: unknown;
+  lineraPrivateKey: LineraSignerInterface;
   lineraOwner: string;
   signature: string;
 }> {
