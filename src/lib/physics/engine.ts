@@ -35,7 +35,8 @@ export interface ResetPuckOptions {
 // Paddle velocity tracking state
 interface PaddleState {
   lastPosition: { x: number; y: number };
-  velocity: { x: number; y: number };
+  velocity: { x: number; y: number };         // Smoothed for display
+  instantVelocity: { x: number; y: number };  // Raw for collision
   lastMoveTime: number;
 }
 
@@ -64,11 +65,13 @@ export function createGameEngine(callbacks: EngineCallbacks): GameEngine {
     player1: {
       lastPosition: { x: table.width / 2, y: table.height * 0.85 },
       velocity: { x: 0, y: 0 },
+      instantVelocity: { x: 0, y: 0 },
       lastMoveTime: performance.now(),
     },
     player2: {
       lastPosition: { x: table.width / 2, y: table.height * 0.15 },
       velocity: { x: 0, y: 0 },
+      instantVelocity: { x: 0, y: 0 },
       lastMoveTime: performance.now(),
     },
   };
@@ -92,9 +95,10 @@ export function createGameEngine(callbacks: EngineCallbacks): GameEngine {
           const paddleLabel = labels.find(
             (l) => l === 'player1' || l === 'player2'
           ) as Player;
-          const paddleVel = paddleStates[paddleLabel].velocity;
+          // Use instantaneous velocity for responsive hit detection
+          const paddleVel = paddleStates[paddleLabel].instantVelocity;
 
-          // Apply paddle velocity to puck
+          // Apply paddle velocity to puck - proportional to paddle speed
           const transfer = paddleConfig.velocityTransfer;
           const maxVel = paddleConfig.maxVelocity;
           const { puck: puckConfig } = PHYSICS_CONFIG;
@@ -109,8 +113,7 @@ export function createGameEngine(callbacks: EngineCallbacks): GameEngine {
           let newVelX = puck.velocity.x + velX;
           let newVelY = puck.velocity.y + velY;
 
-          // CRITICAL: Clamp TOTAL velocity to maxSpeed immediately
-          // This prevents velocity from exceeding maxSpeed after paddle hit
+          // Clamp total velocity to maxSpeed
           const newSpeed = Math.sqrt(newVelX ** 2 + newVelY ** 2);
           if (newSpeed > puckConfig.maxSpeed) {
             const scale = puckConfig.maxSpeed / newSpeed;
@@ -173,13 +176,16 @@ export function createGameEngine(callbacks: EngineCallbacks): GameEngine {
       );
     }
 
-    // Calculate velocity from position delta (pixels per second)
+    // Calculate instantaneous velocity from position delta (pixels per second)
     const dt = Math.max(now - state.lastMoveTime, 1) / 1000; // Convert to seconds
     const newVelX = (clampedX - state.lastPosition.x) / dt;
     const newVelY = (clampedY - state.lastPosition.y) / dt;
 
-    // Smooth velocity with exponential moving average to reduce jitter
-    const smoothing = 0.3;
+    // Store instantaneous velocity for collision detection (raw, unsmoothed)
+    state.instantVelocity = { x: newVelX, y: newVelY };
+
+    // Light smoothing only for display purposes (0.7 = mostly new value)
+    const smoothing = 0.7;
     state.velocity = {
       x: state.velocity.x * (1 - smoothing) + newVelX * smoothing,
       y: state.velocity.y * (1 - smoothing) + newVelY * smoothing,

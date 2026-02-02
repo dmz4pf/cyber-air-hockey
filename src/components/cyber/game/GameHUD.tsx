@@ -11,7 +11,7 @@ import { CountdownOverlay } from './CountdownOverlay';
 import { PauseMenu } from './PauseMenu';
 import { PreMatchScreen } from './PreMatchScreen';
 import { PostMatchScreen } from './PostMatchScreen';
-import { CyberButton } from '../ui/CyberButton';
+import { GoalCelebration } from './GoalCelebration';
 
 interface GameHUDProps {
   children?: React.ReactNode;
@@ -49,25 +49,12 @@ export function GameHUD({ children, className = '' }: GameHUDProps) {
       {/* Game canvas container */}
       <div className="relative w-full h-full">{children}</div>
 
-      {/* Pause button - top right corner, only show during gameplay */}
-      {status === 'playing' && (
-        <div className="absolute top-4 right-4 z-20">
-          <CyberButton
-            variant="ghost"
-            size="sm"
-            onClick={pauseGame}
-            className="opacity-60 hover:opacity-100"
-          >
-            PAUSE
-          </CyberButton>
-        </div>
-      )}
-
       {/* Game state overlays */}
       <PreMatchScreen />
       <CountdownOverlay />
       <PauseMenu />
       <PostMatchScreen />
+      <GoalCelebration />
     </div>
   );
 }

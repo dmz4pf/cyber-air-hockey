@@ -42,6 +42,8 @@ const difficultyConfig: Record<
 
 export function PreMatchScreen({ className = '' }: PreMatchScreenProps) {
   const status = useGameStore((state) => state.status);
+  const mode = useGameStore((state) => state.mode);
+  const gameModeType = useGameStore((state) => state.gameModeType);
   const difficulty = useGameStore((state) => state.difficulty);
   const setDifficulty = useGameStore((state) => state.setDifficulty);
   const startGame = useGameStore((state) => state.startGame);
@@ -49,7 +51,9 @@ export function PreMatchScreen({ className = '' }: PreMatchScreenProps) {
   const profile = usePlayerStore((state) => state.profile);
   const settings = useSettingsStore((state) => state.settings);
 
-  if (status !== 'menu') return null;
+  // Only show in AI mode when status is 'menu'
+  // Never show in multiplayer mode
+  if (status !== 'menu' || mode === 'multiplayer' || gameModeType === 'multiplayer') return null;
 
   return (
     <div

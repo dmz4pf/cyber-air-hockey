@@ -19,6 +19,7 @@ export function ScoreOverlay({ className = '' }: ScoreOverlayProps) {
   const combo = useGameStore((state) => state.combo);
   const difficulty = useGameStore((state) => state.difficulty);
   const mode = useGameStore((state) => state.mode);
+  const playerNumber = useGameStore((state) => state.playerNumber);
   const profile = usePlayerStore((state) => state.profile);
 
   const playerName = profile?.username || 'You';
@@ -31,22 +32,27 @@ export function ScoreOverlay({ className = '' }: ScoreOverlayProps) {
       ? 'Medium AI'
       : 'Hard AI';
 
-  // Dynamic colors based on who's winning
-  const player1Winning = scores.player1 > scores.player2;
-  const player2Winning = scores.player2 > scores.player1;
-  const isTied = scores.player1 === scores.player2;
+  // For Player 2 in multiplayer, swap the scores so "You" shows their score
+  const isPlayer2 = mode === 'multiplayer' && playerNumber === 2;
+  const myScore = isPlayer2 ? scores.player2 : scores.player1;
+  const opponentScore = isPlayer2 ? scores.player1 : scores.player2;
 
-  // Player 1 color: green if winning, red if losing, neutral (primary blue) if tied
-  const player1Color = isTied
+  // Dynamic colors based on who's winning (from local player's perspective)
+  const meWinning = myScore > opponentScore;
+  const opponentWinning = opponentScore > myScore;
+  const isTied = myScore === opponentScore;
+
+  // My color: green if winning, red if losing, neutral (primary blue) if tied
+  const myColor = isTied
     ? cyberTheme.colors.primary
-    : player1Winning
+    : meWinning
       ? cyberTheme.colors.success
       : cyberTheme.colors.error;
 
-  // Player 2 color: green if winning, red if losing, neutral (primary blue) if tied
-  const player2Color = isTied
+  // Opponent color: green if winning, red if losing, neutral (primary blue) if tied
+  const opponentColor = isTied
     ? cyberTheme.colors.primary
-    : player2Winning
+    : opponentWinning
       ? cyberTheme.colors.success
       : cyberTheme.colors.error;
 
@@ -60,32 +66,32 @@ export function ScoreOverlay({ className = '' }: ScoreOverlayProps) {
           border: `1px solid ${cyberTheme.colors.border.default}`,
         }}
       >
-        {/* Player 1 (You) - Left side */}
+        {/* You - Left side */}
         <div className="flex items-center gap-4 flex-1">
           <div
             className="px-4 py-2 rounded-lg"
             style={{
-              backgroundColor: `${player1Color}15`,
-              border: `2px solid ${player1Color}`,
-              boxShadow: `0 0 15px ${player1Color}40`,
+              backgroundColor: `${myColor}15`,
+              border: `2px solid ${myColor}`,
+              boxShadow: `0 0 15px ${myColor}40`,
             }}
           >
             <div
               className="text-4xl font-black tabular-nums"
               style={{
-                color: player1Color,
+                color: myColor,
                 fontFamily: cyberTheme.fonts.heading,
-                textShadow: `0 0 15px ${player1Color}`,
+                textShadow: `0 0 15px ${myColor}`,
               }}
             >
-              {scores.player1}
+              {myScore}
             </div>
           </div>
           <div>
             <div
               className="text-sm font-bold uppercase tracking-wider"
               style={{
-                color: player1Color,
+                color: myColor,
                 fontFamily: cyberTheme.fonts.heading,
               }}
             >
@@ -95,7 +101,7 @@ export function ScoreOverlay({ className = '' }: ScoreOverlayProps) {
               className="text-xs uppercase"
               style={{ color: cyberTheme.colors.text.muted }}
             >
-              Player 1
+              You
             </div>
           </div>
         </div>
@@ -115,13 +121,13 @@ export function ScoreOverlay({ className = '' }: ScoreOverlayProps) {
           {combo.current >= 2 && <ComboCounter combo={combo.current} size="sm" />}
         </div>
 
-        {/* Player 2 (Opponent) - Right side */}
+        {/* Opponent - Right side */}
         <div className="flex items-center gap-4 flex-1 justify-end">
           <div className="text-right">
             <div
               className="text-sm font-bold uppercase tracking-wider"
               style={{
-                color: player2Color,
+                color: opponentColor,
                 fontFamily: cyberTheme.fonts.heading,
               }}
             >
@@ -131,26 +137,26 @@ export function ScoreOverlay({ className = '' }: ScoreOverlayProps) {
               className="text-xs uppercase"
               style={{ color: cyberTheme.colors.text.muted }}
             >
-              Player 2
+              Opponent
             </div>
           </div>
           <div
             className="px-4 py-2 rounded-lg"
             style={{
-              backgroundColor: `${player2Color}15`,
-              border: `2px solid ${player2Color}`,
-              boxShadow: `0 0 15px ${player2Color}40`,
+              backgroundColor: `${opponentColor}15`,
+              border: `2px solid ${opponentColor}`,
+              boxShadow: `0 0 15px ${opponentColor}40`,
             }}
           >
             <div
               className="text-4xl font-black tabular-nums"
               style={{
-                color: player2Color,
+                color: opponentColor,
                 fontFamily: cyberTheme.fonts.heading,
-                textShadow: `0 0 15px ${player2Color}`,
+                textShadow: `0 0 15px ${opponentColor}`,
               }}
             >
-              {scores.player2}
+              {opponentScore}
             </div>
           </div>
         </div>

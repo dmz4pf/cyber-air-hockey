@@ -20,7 +20,7 @@
 import { useCallback, useRef, useEffect } from 'react';
 import { useMultiplayerContext, ServerGameState } from '@/contexts/MultiplayerContext';
 import { useGameStore } from '@/stores/gameStore';
-import { usePaddleInterpolation } from './useInterpolation';
+import { useInterpolation, usePaddleInterpolation } from './useInterpolation';
 import { PHYSICS_CONFIG } from '@/lib/physics/config';
 
 // Canvas dimensions for coordinate transformation
@@ -110,8 +110,10 @@ export function useMultiplayerGameEngine({ gameId, playerId }: UseMultiplayerGam
     }
   }, [gameId, playerId, connect]);
 
-  // Paddle interpolation for smoother visuals
+  // Interpolation for smoother visuals
+  const puckInterpolation = useInterpolation({ delayMs: 33, maxExtrapolateMs: 50 }); // ~2 frames delay
   const opponentPaddleInterp = usePaddleInterpolation(0.4);
+  const puckSeqRef = useRef<number>(0); // Local sequence counter for puck updates
 
   // Store refs for rendering
   const lastServerStateRef = useRef<ServerGameState | null>(null);
@@ -149,13 +151,25 @@ export function useMultiplayerGameEngine({ gameId, playerId }: UseMultiplayerGam
         player2: gameState.score.player2,
       });
 
+      // Feed puck data to interpolation system for smooth rendering
+      // Convert from server coordinates to canvas coordinates
+      const puckCanvas = serverToCanvas(gameState.puck.x, gameState.puck.y);
+      puckSeqRef.current += 1;
+      puckInterpolation.addSnapshot({
+        x: puckCanvas.x,
+        y: puckCanvas.y,
+        vx: gameState.puck.vx,
+        vy: gameState.puck.vy,
+        seq: puckSeqRef.current,
+      });
+
       // Update opponent paddle interpolation target
       // Convert from server coordinates (center-origin) to canvas coordinates (top-left origin)
       const opponentPaddle = playerNumber === 1 ? gameState.paddle2 : gameState.paddle1;
       const canvasCoords = serverToCanvas(opponentPaddle.x, opponentPaddle.y);
       opponentPaddleInterp.setTarget(canvasCoords.x, canvasCoords.y);
     }
-  }, [gameState, playerNumber, setMultiplayerScores, opponentPaddleInterp]);
+  }, [gameState, playerNumber, setMultiplayerScores, opponentPaddleInterp, puckInterpolation]);
 
   // Sync countdown to game store
   useEffect(() => {
@@ -196,6 +210,12 @@ export function useMultiplayerGameEngine({ gameId, playerId }: UseMultiplayerGam
   // Move player's paddle and send to server
   const movePaddle = useCallback(
     (paddleOwner: 'player1' | 'player2', x: number, y: number) => {
+      // Must have playerNumber assigned from server before we can send moves
+      if (!playerNumber) {
+        console.log('[MultiplayerEngine] Cannot move paddle: playerNumber not yet assigned');
+        return;
+      }
+
       // Only allow moving our own paddle
       // Note: In our rendering, paddle1 is always "our" paddle (bottom of screen)
       // So we accept 'player1' from input handler for the local player
@@ -287,18 +307,19 @@ export function useMultiplayerGameEngine({ gameId, playerId }: UseMultiplayerGam
       };
     }
 
-    // Get interpolated opponent paddle position for smoother rendering
+    // Get interpolated positions for smoother rendering
+    const interpolatedPuck = puckInterpolation.getInterpolatedPosition();
     const opponentPos = opponentPaddleInterp.getPosition();
 
-    // Convert puck from server coords to canvas coords
-    const puckCanvas = serverToCanvas(serverState.puck.x, serverState.puck.y);
+    // Use interpolated puck position, fall back to server state if interpolation not ready
+    const puckCanvas = interpolatedPuck || serverToCanvas(serverState.puck.x, serverState.puck.y);
 
     if (isPlayer2) {
       // Player 2 perspective: rotate everything 180 degrees
       // - Their paddle (server's paddle2) appears at bottom as paddle1
       // - Opponent's paddle (server's paddle1) appears at top as paddle2
 
-      // Puck: convert to canvas coords, then rotate for Player 2's view
+      // Puck: already in canvas coords from interpolation, rotate for Player 2's view
       const puckRotated = rotatePoint(puckCanvas.x, puckCanvas.y);
 
       // Our paddle (Player 2's): use local ref (already in local view coords)
@@ -324,12 +345,15 @@ export function useMultiplayerGameEngine({ gameId, playerId }: UseMultiplayerGam
       paddle1: { position: paddle1Pos },
       paddle2: { position: paddle2Pos },
     };
-  }, [playerNumber, opponentPaddleInterp]);
+  }, [playerNumber, opponentPaddleInterp, puckInterpolation]);
 
-  // Reset puck (no-op for client, server handles this)
+  // Reset puck (clear interpolation buffers)
   const resetPuck = useCallback(() => {
-    // Server is authoritative, client doesn't reset puck
-  }, []);
+    // Server is authoritative for physics, but clear local interpolation buffers
+    puckInterpolation.clear();
+    opponentPaddleInterp.clear();
+    puckSeqRef.current = 0;
+  }, [puckInterpolation, opponentPaddleInterp]);
 
   return {
     // Connection state

@@ -58,6 +58,7 @@ export default function CyberGamePage() {
   const maxScore = useGameStore((state) => state.maxScore);
   const difficulty = useGameStore((state) => state.difficulty);
   const mode = useGameStore((state) => state.mode);
+  const gameModeType = useGameStore((state) => state.gameModeType);
   const playerNumber = useGameStore((state) => state.playerNumber);
   const multiplayerGameInfo = useGameStore((state) => state.multiplayerGameInfo);
   const setCountdown = useGameStore((state) => state.setCountdown);
@@ -70,11 +71,13 @@ export default function CyberGamePage() {
   const audio = useAudioOptional();
 
   // Is this a multiplayer game in active play?
-  const isMultiplayerGame = mode === 'multiplayer' && multiplayerGameInfo?.gameId;
+  // Use gameModeType (explicit) OR mode for backwards compatibility
+  // gameModeType is more reliable as it's explicitly set during game creation/joining
+  const isMultiplayerGame = (gameModeType === 'multiplayer' || mode === 'multiplayer') && multiplayerGameInfo?.gameId;
   const isInMultiplayerGameplay = isMultiplayerGame && ['countdown', 'playing', 'paused', 'goal', 'gameover'].includes(pageState);
 
   // Debug: Log multiplayer state
-  console.log('[GamePage] State:', { mode, pageState, isMultiplayerGame, isInMultiplayerGameplay, gameId: multiplayerGameInfo?.gameId });
+  console.log('[GamePage] State:', { mode, gameModeType, pageState, isMultiplayerGame, isInMultiplayerGameplay, gameId: multiplayerGameInfo?.gameId, playerNumber });
 
   // Use the playerId stored in the game store (set when game was created/joined)
   const playerId = multiplayerGameInfo?.playerId || '';
@@ -85,6 +88,42 @@ export default function CyberGamePage() {
       setMaxScore(settings.game.scoreToWin);
     }
   }, [settings.game.scoreToWin, maxScore, setMaxScore]);
+
+  // Reset game state when navigating away from /game page
+  // This ensures fresh state when user returns via "Play Now" or navigation
+  useEffect(() => {
+    return () => {
+      // Only reset if game has ended - don't reset if user is mid-game
+      const currentPageState = useGameStore.getState().pageState;
+      if (currentPageState === 'gameover') {
+        resetGame();
+      }
+    };
+  }, [resetGame]);
+
+  // ============================================================================
+  // Fullscreen Mode: Lock body scroll and prevent interactions outside game
+  // ============================================================================
+  const isInFullscreenGame = ['countdown', 'playing', 'paused', 'goal', 'gameover'].includes(pageState);
+
+  useEffect(() => {
+    if (isInFullscreenGame) {
+      // Prevent body scroll
+      document.body.style.overflow = 'hidden';
+      // Prevent touch scroll on mobile
+      document.body.style.touchAction = 'none';
+    } else {
+      // Restore scroll
+      document.body.style.overflow = '';
+      document.body.style.touchAction = '';
+    }
+
+    return () => {
+      // Cleanup on unmount
+      document.body.style.overflow = '';
+      document.body.style.touchAction = '';
+    };
+  }, [isInFullscreenGame]);
 
   // ============================================================================
   // Audio: Music state management
@@ -168,6 +207,16 @@ export default function CyberGamePage() {
   // ============================================================================
   // Unified Interface - Select the appropriate engine
   // ============================================================================
+  // CRITICAL: Log which engine is being used for debugging multiplayer issues
+  if (status === 'playing') {
+    console.log('[GamePage] Engine selection:', {
+      isInMultiplayerGameplay,
+      usingEngine: isInMultiplayerGameplay ? 'MULTIPLAYER' : 'AI',
+      multiplayerPlayerNumber: multiplayerEngine.playerNumber,
+      multiplayerConnected: multiplayerEngine.isConnected,
+    });
+  }
+
   const getBodies = isInMultiplayerGameplay
     ? multiplayerEngine.getBodies
     : aiEngine.getBodies;
@@ -264,12 +313,13 @@ export default function CyberGamePage() {
       case 'paused':
       case 'goal':
       case 'gameover':
-        // Show game canvas
+        // Show game canvas - FULLSCREEN MODE
         return (
           <div
-            className="min-h-screen flex items-center justify-center p-4"
+            className="fixed inset-0 flex items-center justify-center p-4"
             style={{
               backgroundColor: cyberTheme.colors.bg.primary,
+              zIndex: 100, // Above navbar and everything else
             }}
           >
             {/* Game container */}
@@ -313,7 +363,7 @@ export default function CyberGamePage() {
                   {isInMultiplayerGameplay && (
                     <MultiplayerPauseOverlay
                       pauseState={multiplayerEngine.pauseState}
-                      playerNumber={playerNumber}
+                      playerNumber={multiplayerEngine.playerNumber}
                       onResume={multiplayerEngine.sendResumeRequest}
                       onQuit={multiplayerEngine.sendQuitGame}
                     />
@@ -323,7 +373,7 @@ export default function CyberGamePage() {
                   {isInMultiplayerGameplay && (
                     <OpponentQuitModal
                       opponentQuit={multiplayerEngine.opponentQuit}
-                      playerNumber={playerNumber}
+                      playerNumber={multiplayerEngine.playerNumber}
                       onContinue={resetGame}
                     />
                   )}
@@ -333,7 +383,7 @@ export default function CyberGamePage() {
                     <MultiplayerGameOverModal
                       isVisible={true}
                       winner={multiplayerEngine.winner}
-                      playerNumber={playerNumber}
+                      playerNumber={multiplayerEngine.playerNumber}
                       finalScore={multiplayerEngine.gameState?.score || null}
                       rematchState={multiplayerEngine.rematchState}
                       opponentExited={multiplayerEngine.opponentExited}
@@ -354,7 +404,41 @@ export default function CyberGamePage() {
                   )}
                 </GameHUD>
               </div>
+
             </div>
+
+            {/* ESC to pause hint - Top right corner, only during active play */}
+            {status === 'playing' && (
+              <div
+                className="absolute top-4 right-4 z-10"
+              >
+                <div
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg"
+                  style={{
+                    backgroundColor: `${cyberTheme.colors.primary}15`,
+                    border: `1px solid ${cyberTheme.colors.primary}40`,
+                  }}
+                >
+                  <kbd
+                    className="px-2 py-0.5 rounded text-xs font-bold"
+                    style={{
+                      backgroundColor: cyberTheme.colors.bg.tertiary,
+                      color: cyberTheme.colors.primary,
+                      border: `1px solid ${cyberTheme.colors.primary}`,
+                      fontFamily: cyberTheme.fonts.heading,
+                    }}
+                  >
+                    ESC
+                  </kbd>
+                  <span
+                    className="text-xs uppercase tracking-wider"
+                    style={{ color: cyberTheme.colors.text.secondary }}
+                  >
+                    to pause
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         );
 
@@ -365,3 +449,5 @@ export default function CyberGamePage() {
 
   return renderPageContent();
 }
+
+

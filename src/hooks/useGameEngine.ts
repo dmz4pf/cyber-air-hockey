@@ -19,9 +19,14 @@ export function useGameEngine() {
   const lastTimeRef = useRef<number>(0);
 
   const status = useGameStore((state) => state.status);
+  const mode = useGameStore((state) => state.mode);
+  const gameModeType = useGameStore((state) => state.gameModeType);
   const lastScorer = useGameStore((state) => state.lastScorer);
   const scoreGoal = useGameStore((state) => state.scoreGoal);
   const resumeAfterGoal = useGameStore((state) => state.resumeAfterGoal);
+
+  // Only run AI engine when NOT in multiplayer mode
+  const isMultiplayer = mode === 'multiplayer' || gameModeType === 'multiplayer';
 
   // Audio context for sound effects
   const audio = useAudioOptional();
@@ -58,8 +63,10 @@ export function useGameEngine() {
     };
   }, [scoreGoal]);
 
-  // Handle goal pause and reset
+  // Handle goal pause and reset (AI mode only - server handles this in multiplayer)
   useEffect(() => {
+    if (isMultiplayer) return; // Server is authoritative in multiplayer
+
     if (status === 'goal') {
       const timer = setTimeout(() => {
         if (gameEngineRef.current) {
@@ -76,10 +83,12 @@ export function useGameEngine() {
 
       return () => clearTimeout(timer);
     }
-  }, [status, lastScorer, resumeAfterGoal]);
+  }, [status, lastScorer, resumeAfterGoal, isMultiplayer]);
 
-  // Reset puck when game starts (scores are 0-0)
+  // Reset puck when game starts (AI mode only - server handles this in multiplayer)
   useEffect(() => {
+    if (isMultiplayer) return; // Server is authoritative in multiplayer
+
     if (status === 'playing' && gameEngineRef.current) {
       // Only reset if scores are 0-0 (new game)
       const store = useGameStore.getState();
@@ -87,10 +96,15 @@ export function useGameEngine() {
         gameEngineRef.current.resetPuck({ isGameStart: true });
       }
     }
-  }, [status]);
+  }, [status, isMultiplayer]);
 
-  // Game loop
+  // Game loop - only runs for AI mode, NOT multiplayer
   useEffect(() => {
+    // Skip physics loop entirely in multiplayer mode - server is authoritative
+    if (isMultiplayer) {
+      return;
+    }
+
     if (status !== 'playing') {
       lastTimeRef.current = 0;
       return;
@@ -118,7 +132,7 @@ export function useGameEngine() {
         cancelAnimationFrame(frameRef.current);
       }
     };
-  }, [status]);
+  }, [status, isMultiplayer]);
 
   // Move paddle function
   const movePaddle = useCallback(

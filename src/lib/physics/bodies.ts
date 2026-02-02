@@ -46,11 +46,9 @@ export function createPaddle(player: 'player1' | 'player2'): Matter.Body {
     paddle.radius,
     {
       label: player,
-      mass: paddle.mass,
+      isStatic: true,  // Kinematic - position controlled directly, not by physics
       restitution: paddle.restitution,
       friction: paddle.friction,
-      frictionAir: 0.9,
-      frictionStatic: 0,
       render: {
         fillStyle: color,
       },

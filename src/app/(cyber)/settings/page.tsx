@@ -108,37 +108,6 @@ export default function CyberSettingsPage() {
                   className="font-medium"
                   style={{ color: cyberTheme.colors.text.primary }}
                 >
-                  Default Difficulty
-                </div>
-                <div
-                  className="text-sm"
-                  style={{ color: cyberTheme.colors.text.muted }}
-                >
-                  AI difficulty for new matches
-                </div>
-              </div>
-              <Select
-                options={[
-                  { value: 'easy', label: 'Easy' },
-                  { value: 'medium', label: 'Medium' },
-                  { value: 'hard', label: 'Hard' },
-                ]}
-                value={settings.game.aiDifficulty}
-                onChange={(v) =>
-                  updateGameSettings({
-                    aiDifficulty: v as 'easy' | 'medium' | 'hard',
-                  })
-                }
-                size="sm"
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <div
-                  className="font-medium"
-                  style={{ color: cyberTheme.colors.text.primary }}
-                >
                   Match Type
                 </div>
                 <div

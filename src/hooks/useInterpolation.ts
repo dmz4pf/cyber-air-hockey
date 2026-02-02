@@ -41,9 +41,14 @@ export function useInterpolation(options: InterpolationOptions = {}) {
   const snapshotsRef = useRef<Snapshot[]>([]);
   const lastSeqRef = useRef<number>(-1);
 
+  // Threshold for detecting position jumps (e.g., puck reset to center)
+  // If position changes by more than this in one update, clear the buffer
+  const JUMP_THRESHOLD = 100; // pixels
+
   /**
    * Add a new snapshot from the network.
    * Snapshots are expected in order (by seq), but we handle out-of-order arrivals.
+   * Detects position jumps (like puck reset) and clears buffer to prevent interpolation artifacts.
    */
   const addSnapshot = useCallback((data: {
     x: number;
@@ -55,6 +60,20 @@ export function useInterpolation(options: InterpolationOptions = {}) {
     // Ignore old/duplicate snapshots
     if (data.seq <= lastSeqRef.current) {
       return;
+    }
+
+    // Check for position jump (puck reset detection)
+    const snapshots = snapshotsRef.current;
+    if (snapshots.length > 0) {
+      const last = snapshots[snapshots.length - 1];
+      const dx = data.x - last.x;
+      const dy = data.y - last.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      // If position jumped significantly, clear buffer to prevent interpolation artifacts
+      if (distance > JUMP_THRESHOLD) {
+        snapshotsRef.current = [];
+      }
     }
 
     const snapshot: Snapshot = {

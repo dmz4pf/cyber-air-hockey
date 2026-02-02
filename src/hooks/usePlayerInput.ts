@@ -67,19 +67,14 @@ export function usePlayerInput({
     }
     window.addEventListener('resize', updateCanvasRect);
 
-    // Smoothing factor (0 = no smoothing, 1 = instant)
-    const smoothing = 0.6;
-
+    // Use raw position - smoothing is handled in physics engine
     const handleMove = (clientX: number, clientY: number) => {
       const pos = getCanvasPosition(clientX, clientY);
       if (!pos) return;
 
-      // Apply smoothing to reduce jitter
-      const smoothedX = currentPosRef.current.x + (pos.x - currentPosRef.current.x) * smoothing;
-      const smoothedY = currentPosRef.current.y + (pos.y - currentPosRef.current.y) * smoothing;
-
-      currentPosRef.current = { x: smoothedX, y: smoothedY };
-      onMove(smoothedX, smoothedY);
+      // Pass raw position directly - velocity tracking needs accurate deltas
+      currentPosRef.current = { x: pos.x, y: pos.y };
+      onMove(pos.x, pos.y);
     };
 
     // Mouse events - track on document to prevent losing cursor

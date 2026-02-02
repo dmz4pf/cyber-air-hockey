@@ -7,7 +7,9 @@
 
 // Environment detection
 export const IS_PRODUCTION = process.env.NODE_ENV === 'production';
-export const USE_MOCK_CLIENT = process.env.NEXT_PUBLIC_USE_MOCK_LINERA === 'true' || !IS_PRODUCTION;
+// Use mock only if explicitly set to 'true', otherwise use real client
+// This allows development to use real Linera for testing
+export const USE_MOCK_CLIENT = process.env.NEXT_PUBLIC_USE_MOCK_LINERA === 'true';
 
 // Linera Network Configuration
 export const LINERA_CONFIG = {

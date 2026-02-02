@@ -43,8 +43,14 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: 'Air Hockey',
-  description: 'Classic air hockey game built with Next.js and Matter.js',
+  title: 'Air Hockey | Cyber Arena',
+  description: 'Neon-powered air hockey game with multiplayer and AI modes',
+  icons: {
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+    ],
+    apple: '/apple-icon.svg',
+  },
 };
 
 export default function RootLayout({

@@ -26,8 +26,8 @@ export const PHYSICS_CONFIG: PhysicsConfig = {
     mass: 1,
     restitution: 0.8,
     friction: 0.1,
-    velocityTransfer: 0.5,  // 50% of paddle velocity transfers to puck
-    maxVelocity: 15,        // Cap paddle velocity contribution
+    velocityTransfer: 0.8,  // 80% of paddle velocity transfers to puck
+    maxVelocity: 30,        // Higher cap for responsive hits
   },
 
   wall: {
