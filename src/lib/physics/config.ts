@@ -38,7 +38,7 @@ export const PHYSICS_CONFIG: PhysicsConfig = {
   game: {
     maxScore: 7,
     countdownSeconds: 3,
-    goalPauseMs: 2000,
+    goalPauseMs: 3500,
   },
 };
 
