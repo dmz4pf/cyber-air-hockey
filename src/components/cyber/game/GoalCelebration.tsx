@@ -85,11 +85,11 @@ export function GoalCelebration() {
         );
       }, 16);
 
-      // Clean up
+      // Clean up - animation finishes at 1s, leaving 2.5s clean reposition time
       const cleanupTimer = setTimeout(() => {
         setShowText(false);
         setParticles([]);
-      }, 1500);
+      }, 1000);
 
       return () => {
         clearTimeout(flashTimer);
