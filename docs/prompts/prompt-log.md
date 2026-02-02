@@ -3,7 +3,7 @@
 ## 2026-01-12
 
 ### Prompt 1
-> i need to deploy this cyper air hockey game to vercel. come up with a comprehensive plan to achieve this(use the claude md instructions).
+> i need to deploy this cyper air hockey game to vercel. come up with a comprehensive plan to achieve this.
 
 **Action:** Created comprehensive deployment plan for Vercel deployment of the Air Hockey game, including WebSocket server deployment strategy.
 
