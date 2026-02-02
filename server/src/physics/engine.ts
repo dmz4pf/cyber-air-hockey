@@ -300,8 +300,9 @@ export class PhysicsEngine {
         this.goalScored = true;
         this.score[scorer === 1 ? 'player1' : 'player2']++;
 
-        // STOP puck immediately when goal scored (prevents puck from escaping during pause)
+        // STOP puck and HIDE it off-screen during goal pause
         Matter.Body.setVelocity(this.puck, { x: 0, y: 0 });
+        Matter.Body.setPosition(this.puck, { x: 0, y: -9999 }); // Hide off-screen
 
         if (this.onGoalCallback) {
           this.onGoalCallback(scorer);

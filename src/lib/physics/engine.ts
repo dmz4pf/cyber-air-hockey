@@ -85,9 +85,15 @@ export function createGameEngine(callbacks: EngineCallbacks): GameEngine {
       if (labels.includes('puck')) {
         if (labels.includes('goal1')) {
           // Puck entered Player 1's goal -> Player 2 scores
+          // Hide puck off-screen during goal pause
+          Body.setVelocity(puck, { x: 0, y: 0 });
+          Body.setPosition(puck, { x: table.width / 2, y: -9999 });
           callbacks.onGoal('player2');
         } else if (labels.includes('goal2')) {
           // Puck entered Player 2's goal -> Player 1 scores
+          // Hide puck off-screen during goal pause
+          Body.setVelocity(puck, { x: 0, y: 0 });
+          Body.setPosition(puck, { x: table.width / 2, y: -9999 });
           callbacks.onGoal('player1');
         }
         // Paddle hit - apply velocity transfer
