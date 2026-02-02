@@ -146,7 +146,7 @@ export function GoalCelebration() {
               animation: 'goalPulse 0.5s ease-out',
             }}
           >
-            {isMyGoal ? 'GOAL!' : 'SCORED'}
+            GOAL!
           </div>
         </div>
       )}

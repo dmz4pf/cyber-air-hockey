@@ -32,7 +32,7 @@ export const PHYSICS_CONFIG = {
   game: {
     maxScore: 7,
     countdownSeconds: 3,
-    goalPauseMs: 1500,
+    goalPauseMs: 2000,
     tickRate: 60,        // Physics updates per second
     broadcastRate: 30    // State broadcasts per second
   }
