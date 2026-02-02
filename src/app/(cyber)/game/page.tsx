@@ -252,10 +252,11 @@ export default function CyberGamePage() {
   );
 
   // Handle player input with stable canvas ref
+  // Allow movement during 'goal' status so players can reposition
   usePlayerInput({
     canvasRef: canvasElementRef,
     onMove: handlePlayerMove,
-    enabled: status === 'playing',
+    enabled: status === 'playing' || status === 'goal',
   });
 
   // Handle AI opponent (only for AI mode, not multiplayer)

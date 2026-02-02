@@ -134,10 +134,10 @@ export function useGameEngine() {
     };
   }, [status, isMultiplayer]);
 
-  // Move paddle function
+  // Move paddle function - allow during goal status for repositioning
   const movePaddle = useCallback(
     (player: Player, x: number, y: number) => {
-      if (gameEngineRef.current && status === 'playing') {
+      if (gameEngineRef.current && (status === 'playing' || status === 'goal')) {
         gameEngineRef.current.movePaddle(player, x, y);
       }
     },
