@@ -13,8 +13,7 @@
     </filter>
   </defs>
 
-  <rect width="180" height="180" rx="40" fill="#0a1628"/>
-
+  <!-- Lightning bolt only - transparent background -->
   <path
     d="M112 20 L59 87 L87 87 L67 160 L120 82 L92 82 Z"
     fill="url(#bolt)"

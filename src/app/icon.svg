@@ -15,10 +15,7 @@
     </filter>
   </defs>
 
-  <!-- Dark blue background -->
-  <rect width="512" height="512" fill="#0a1628"/>
-
-  <!-- Lightning bolt -->
+  <!-- Lightning bolt only - transparent background -->
   <path
     d="M320 56 L168 248 L248 248 L192 456 L344 232 L264 232 Z"
     fill="url(#boltGradient)"
